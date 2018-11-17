@@ -47,10 +47,12 @@ def load_data(paths):
 
 
 def construct_training_data_batches():
-    train_src = 'data/iwslt15/train.en'
-    train_tgt = 'data/iwslt15/train.vi'
+    train_src = 'data/iwslt15/train.en.v2'
+    train_tgt = 'data/iwslt15/train.en.v2'
+    # train_src = 'data/iwslt15/mytrain3.en'
+    # train_tgt = 'data/iwslt15/mytrain3.vi'
     vocab_src = 'data/iwslt15/vocab.en'
-    vocab_tgt = 'data/iwslt15/vocab.vi'
+    vocab_tgt = 'data/iwslt15/vocab.en'
 
     vocab_paths = {'vocab_src': vocab_src, 'vocab_tgt': vocab_tgt}
     data_paths = {'train_src': train_src, 'train_tgt': train_tgt}
@@ -96,7 +98,7 @@ def construct_training_data_batches():
         train_tgt_sentence_lengths.append(len(words))
 
 
-    batch_size = 64
+    batch_size = 256
     batches = []
     for i in range(int(num_training_sentences/batch_size)-1):
         batch = {'src_word_ids': train_src_word_ids[i:i+batch_size],
@@ -106,32 +108,34 @@ def construct_training_data_batches():
 
         batches.append(batch)
 
-    return batches, vocab_size
+    return batches, vocab_size, src_word2id, tgt_word2id
 
 class EncoderDecoder(object):
     def __init__(self, params):
         # hyper-parameters / configurations
-        self.learning_rate = 0.1
-        self.batch_size = 64
-        self.num_units = 200
+        self.learning_rate = 0.01
+        self.batch_size = 256
+        self.embedding_size = 200
+        self.num_units = 128
         self.max_sentence_length = 32
         self.params = params
 
+
     def build_network(self):
+
     ################### placeholders
         self.src_word_ids = tf.placeholder(tf.int32, [None, None], name="src_word_ids")
         self.tgt_word_ids = tf.placeholder(tf.int32, [None, None], name="tgt_word_ids")
         self.src_sentence_lengths = tf.placeholder(tf.int32, [None], name="src_sentence_lengths")
         self.tgt_sentence_lengths = tf.placeholder(tf.int32, [None], name="tgt_sentence_lengths")
 
-
     ################### embeddings
 
         self.src_word_embeddings = tf.get_variable("src_word_embeddings",
-                                shape=[self.params['vocab_src_size'], self.params['embedding_size']],
+                                shape=[self.params['vocab_src_size'], self.embedding_size],
                                 initializer=tf.glorot_normal_initializer())
         self.tgt_word_embeddings = tf.get_variable("tgt_word_embeddings",
-                                shape=[self.params['vocab_tgt_size'], self.params['embedding_size']],
+                                shape=[self.params['vocab_tgt_size'], self.embedding_size],
                                 initializer=tf.glorot_normal_initializer())
 
 
@@ -141,28 +145,46 @@ class EncoderDecoder(object):
         #   encoder_inputs:  [batch_size, max_time]
         #   encoder_emb_inp: [batch_size, max_time, embedding_size]
 
+        s = tf.shape(self.src_word_ids) # s[0] = batch_size , s[1] = max_sentecce_length
+
     ################### def build_encoder():
-        # Build an RNN Cell
-        self.encoder_cell = tf.nn.rnn_cell.LSTMCell(self.num_units,
-                    state_is_tuple=True)
+        # Build an RNN
+
+        dropout_lstm_cell1 = tf.nn.rnn_cell.DropoutWrapper(
+                        cell=tf.nn.rnn_cell.LSTMCell(self.num_units, state_is_tuple=True),
+                        input_keep_prob=1.0,
+                        output_keep_prob=1.0,
+                        state_keep_prob=1.0)
+
+
+        self.encoder_lstm_cells = [dropout_lstm_cell1, tf.nn.rnn_cell.LSTMCell(self.num_units, state_is_tuple=True)]
+
+        self.stacked_encocder_cell = tf.nn.rnn_cell.MultiRNNCell(self.encoder_lstm_cells)
 
         # Build a dynamic RNN
         #   encoder_outputs: [batch_size, max_time, num_units]
         #   encoder_state:   [batch_size, num_units]  -> final state
         self.encoder_outputs, self.encoder_state = tf.nn.dynamic_rnn(
-                                            self.encoder_cell, self.src_embedded,
+                                            self.stacked_encocder_cell, self.src_embedded,
                                             sequence_length=self.src_sentence_lengths,
-                                            initial_state=self.encoder_cell.zero_state(self.batch_size, tf.float32),
+                                            initial_state=self.stacked_encocder_cell.zero_state(s[0],dtype=tf.float32),
                                             time_major=False)
 
     ################### def build_decoder():
         # Build an RNN Cell
-        self.decoder_cell = tf.nn.rnn_cell.LSTMCell(self.num_units,
-                    state_is_tuple=True)
+        dropout_lstm_cell2 = tf.nn.rnn_cell.DropoutWrapper(
+                        cell=tf.nn.rnn_cell.LSTMCell(self.num_units, state_is_tuple=True),
+                        input_keep_prob=1.0,
+                        output_keep_prob=1.0,
+                        state_keep_prob=1.0)
+
+        self.decoder_lstm_cells = [dropout_lstm_cell2, tf.nn.rnn_cell.LSTMCell(self.num_units, state_is_tuple=True)]
+
+        self.stacked_decocder_cell = tf.nn.rnn_cell.MultiRNNCell(self.decoder_lstm_cells)
 
         # Helper - A helper for use during training. Only reads inputs.
         #          Returned sample_ids are the argmax of the RNN output logits.
-        self.helper = tf.contrib.seq2seq.TrainingHelper(
+        self.train_helper = tf.contrib.seq2seq.TrainingHelper(
                     inputs=self.tgt_embedded,
                     sequence_length=[self.max_sentence_length]*self.batch_size,
                     time_major=False)
@@ -170,14 +192,16 @@ class EncoderDecoder(object):
         # Decoder
         self.projection_layer = tf.layers.Dense(self.params['vocab_tgt_size'], use_bias=True)
 
-        self.decoder = tf.contrib.seq2seq.BasicDecoder(
-                    self.decoder_cell, self.helper, self.encoder_state,
+        self.train_decoder = tf.contrib.seq2seq.BasicDecoder(
+                    cell=self.stacked_decocder_cell, helper=self.train_helper,
+                    initial_state=self.encoder_state,
                     output_layer=self.projection_layer)
 
     ################## decoding
         # Dynamic decoding
         # (final_outputs, final_state, final_sequence_lengths)
-        (self.outputs, _ , _ ) = tf.contrib.seq2seq.dynamic_decode(self.decoder, output_time_major=False)
+        (self.outputs, _ , _ ) = tf.contrib.seq2seq.dynamic_decode(
+                    self.train_decoder, output_time_major=False)
         self.logits = self.outputs.rnn_output
 
     ################## calculating Loss
@@ -204,20 +228,50 @@ class EncoderDecoder(object):
         self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
         self.train_op = self.optimizer.apply_gradients(zip(self.clipped_gradients, self.trainable_params))
 
+    # ------------------------ inference ------------------------ #
+        # Inference Helper
+        self.infer_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
+                embedding=self.embedding_decoder,
+                start_tokens=tf.fill([s[0]], self.params['sos_id']),
+                end_token=self.params['eos_id'])
+
+        # Decoder
+        self.infer_decoder = tf.contrib.seq2seq.BasicDecoder(
+            cell=self.stacked_decocder_cell,
+            helper=self.infer_helper,
+            initial_state=self.encoder_state,
+            output_layer=self.projection_layer)
+
+        # Dynamic decoding
+        (self.infer_outputs, _ , _ ) = tf.contrib.seq2seq.dynamic_decode(
+                self.infer_decoder,
+                maximum_iterations=self.max_sentence_length)
+
+        self.translations = self.infer_outputs.sample_id
+    # ----------------------------------------------------------- #
+
+    # callable for infer_helper
+    def embedding_decoder(self, ids):
+        return tf.nn.embedding_lookup(self.tgt_word_embeddings, ids)
+
+
 
 def train_model():
-    batches, vocab_size = construct_training_data_batches()
+    batches, vocab_size, src_word2id, tgt_word2id = construct_training_data_batches()
+
+    tgt_id2word = ['<emp>'] + list(tgt_word2id.keys())
 
     params = {'vocab_src_size': vocab_size['src'],
             'vocab_tgt_size': vocab_size['tgt'],
-            'embedding_size': 300 }
+            'sos_id':  tgt_word2id['<s>'],
+            'eos_id':  tgt_word2id['</s>']}
 
     model = EncoderDecoder(params)
     model.build_network()
 
     use_gpu = False
 
-    if use_gpu == False:
+    if use_gpu == True:
         os.environ['CUDA_VISIBLE_DEVICES'] = ''
         sess_config = tf.ConfigProto()
     else:
@@ -225,27 +279,52 @@ def train_model():
         sess_config.gpu_options.allow_growth = True # Whether the GPU memory usage can grow dynamically.
         sess_config.gpu_options.per_process_gpu_memory_fraction = 0.95 # The fraction of GPU memory that the process can use.
 
-    sess = tf.Session(config=sess_config) # sess.close() / sess.run()
-    sess.run(tf.global_variables_initializer())
+    # sess = tf.Session(config=sess_config) # sess.close() / sess.run()
+    with tf.Session(config=sess_config) as sess:
+        sess.run(tf.global_variables_initializer())
 
-    for epoch in range(10):
-        for i, batch in enumerate(batches):
+        for epoch in range(40):
+            print("num_batches = ", len(batches))
+            for i, batch in enumerate(batches):
 
-            feed_dict = { model.src_word_ids: batch['src_word_ids'],
-                        model.tgt_word_ids: batch['tgt_word_ids'],
-                        model.src_sentence_lengths: batch['src_sentence_lengths'],
-                        model.tgt_sentence_lengths: batch['tgt_sentence_lengths']}
+                feed_dict = { model.src_word_ids: batch['src_word_ids'],
+                            model.tgt_word_ids: batch['tgt_word_ids'],
+                            model.src_sentence_lengths: batch['src_sentence_lengths'],
+                            model.tgt_sentence_lengths: batch['tgt_sentence_lengths']}
 
-            # pdb.set_trace()
-            train_loss, _ = sess.run([model.train_loss, model.train_op], feed_dict=feed_dict)
-            # [aa, bb] = sess.run([model.encoder_state, model.outputs], feed_dict=feed_dict)
-            # pdb.set_trace()
-            if i % 10 == 0:
-                print("train_loss: {}".format(train_loss))
+                # pdb.set_trace()
+                train_loss, _ = sess.run([model.train_loss, model.train_op], feed_dict=feed_dict)
+                # [aa] = sess.run([model.s], feed_dict=feed_dict)
+                # pdb.set_trace()
+                if i % 10 == 0:
+                    print("batch: {} --- train_loss: {}".format(i, train_loss))
 
-        print("########## EPOCH {} done ##########".format(epoch))
+                    # --------------------------------------------------- #
+                    my_sentence1 = '<s> They wrote almost a thousand pages on the topic . </s>'
+                    my_sent_ids = []
 
-    sess.close()
+                    for word in my_sentence1.split():
+                        if word in src_word2id:
+                            my_sent_ids.append(src_word2id[word])
+                        else:
+                            my_sent_ids.append(src_word2id['<unk>'])
+
+                    infer_dict = {model.src_word_ids: [my_sent_ids],
+                                model.src_sentence_lengths: [len(my_sent_ids)]}
+
+                    [my_translations] = sess.run([model.translations], feed_dict=infer_dict)
+
+                    # pdb.set_trace()
+
+                    for my_sent in my_translations:
+                        my_words = [tgt_id2word[id] for id in my_sent]
+                        print(' '.join(my_words))
+                    # --------------------------------------------------- #
+
+            print("########## EPOCH {} done ##########".format(epoch))
+
+
+
 
 def main():
     train_model()
