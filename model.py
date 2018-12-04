@@ -22,11 +22,14 @@ def load_vocab(paths):
 
     for i, word in enumerate(vocab_src):
         word = word.strip() # remove \n
-        src_word2id[word] = i+1 # start from 1
+        # src_word2id[word] = i+1 # start from 1
+        src_word2id[word] = i
 
     for i, word in enumerate(vocab_tgt):
         word = word.strip() # remove \n
-        tgt_word2id[word] = i+1 # start from 1
+        # tgt_word2id[word] = i+1 # start from 1
+        tgt_word2id[word] = i
+
 
     # -------------- Special Tokens -------------- #
     # <unk>, <s>, </s> are defined in the vocab list
@@ -47,8 +50,8 @@ def load_data(paths):
 
 
 def construct_training_data_batches():
-    train_src = 'data/iwslt15/train.en.v2'
-    train_tgt = 'data/iwslt15/train.en.v2'
+    train_src = 'data/iwslt15/train.en'
+    train_tgt = 'data/iwslt15/train.en'
     # train_src = 'data/iwslt15/mytrain3.en'
     # train_tgt = 'data/iwslt15/mytrain3.vi'
     vocab_src = 'data/iwslt15/vocab.en'
@@ -75,27 +78,28 @@ def construct_training_data_batches():
         words = sentence.split()
         if len(words) > max_sentence_length:
             continue
-        ids = [0] * max_sentence_length
+        ids = [src_word2id['</s>']] * max_sentence_length
         for i, word in enumerate(words):
             if word in src_word2id:
                 ids[i] = src_word2id[word]
             else:
                 ids[i] = src_word2id['<unk>']
         train_src_word_ids.append(ids)
-        train_src_sentence_lengths.append(len(words))
+        train_src_sentence_lengths.append(len(words)+1) # include one EOS
+
     # Target sentence
     for sentence in train_tgt_sentences:
         words = sentence.split()
         if len(words) > max_sentence_length:
             continue
-        ids = [0] * max_sentence_length
+        ids = [src_word2id['</s>']] * max_sentence_length
         for i, word in enumerate(words):
             if word in tgt_word2id:
                 ids[i] = tgt_word2id[word]
             else:
                 ids[i] = tgt_word2id['<unk>']
         train_tgt_word_ids.append(ids)
-        train_tgt_sentence_lengths.append(len(words))
+        train_tgt_sentence_lengths.append(len(words)+1) # include one EOS
 
 
     batch_size = 256
@@ -109,6 +113,8 @@ def construct_training_data_batches():
         batches.append(batch)
 
     return batches, vocab_size, src_word2id, tgt_word2id
+
+
 
 class EncoderDecoder(object):
     def __init__(self, params):
@@ -129,6 +135,9 @@ class EncoderDecoder(object):
         self.src_sentence_lengths = tf.placeholder(tf.int32, [None], name="src_sentence_lengths")
         self.tgt_sentence_lengths = tf.placeholder(tf.int32, [None], name="tgt_sentence_lengths")
 
+    ################### padding <go>
+        go_id = self.params['go_id']
+        self.tgt_word_ids_with_go = tf.concat( [tf.fill([self.batch_size, 1], go_id), self.tgt_word_ids], 1)
     ################### embeddings
 
         self.src_word_embeddings = tf.get_variable("src_word_embeddings",
@@ -140,7 +149,7 @@ class EncoderDecoder(object):
 
 
         self.src_embedded = tf.nn.embedding_lookup(self.src_word_embeddings, self.src_word_ids)
-        self.tgt_embedded = tf.nn.embedding_lookup(self.tgt_word_embeddings, self.tgt_word_ids)
+        self.tgt_embedded = tf.nn.embedding_lookup(self.tgt_word_embeddings, self.tgt_word_ids_with_go)
         # Look up embedding:
         #   encoder_inputs:  [batch_size, max_time]
         #   encoder_emb_inp: [batch_size, max_time, embedding_size]
@@ -180,7 +189,9 @@ class EncoderDecoder(object):
 
         self.decoder_lstm_cells = [dropout_lstm_cell2, tf.nn.rnn_cell.LSTMCell(self.num_units, state_is_tuple=True)]
 
-        self.stacked_decocder_cell = tf.nn.rnn_cell.MultiRNNCell(self.decoder_lstm_cells)
+        self.stacked_decoder_cell = tf.nn.rnn_cell.MultiRNNCell(self.decoder_lstm_cells)
+
+
 
         # Helper - A helper for use during training. Only reads inputs.
         #          Returned sample_ids are the argmax of the RNN output logits.
@@ -193,7 +204,7 @@ class EncoderDecoder(object):
         self.projection_layer = tf.layers.Dense(self.params['vocab_tgt_size'], use_bias=True)
 
         self.train_decoder = tf.contrib.seq2seq.BasicDecoder(
-                    cell=self.stacked_decocder_cell, helper=self.train_helper,
+                    cell=self.stacked_decoder_cell, helper=self.train_helper,
                     initial_state=self.encoder_state,
                     output_layer=self.projection_layer)
 
@@ -201,7 +212,7 @@ class EncoderDecoder(object):
         # Dynamic decoding
         # (final_outputs, final_state, final_sequence_lengths)
         (self.outputs, _ , _ ) = tf.contrib.seq2seq.dynamic_decode(
-                    self.train_decoder, output_time_major=False)
+                    self.train_decoder, output_time_major=False, impute_finished=True)
         self.logits = self.outputs.rnn_output
 
     ################## calculating Loss
@@ -232,12 +243,16 @@ class EncoderDecoder(object):
         # Inference Helper
         self.infer_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
                 embedding=self.embedding_decoder,
-                start_tokens=tf.fill([s[0]], self.params['sos_id']),
+                start_tokens=tf.fill([s[0]], self.params['go_id']),
                 end_token=self.params['eos_id'])
+        # self.infer_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
+        #         embedding=self.tgt_word_embeddings,
+        #         start_tokens=tf.fill([s[0]], self.params['sos_id']),
+        #         end_token=self.params['eos_id'])
 
         # Decoder
         self.infer_decoder = tf.contrib.seq2seq.BasicDecoder(
-            cell=self.stacked_decocder_cell,
+            cell=self.stacked_decoder_cell,
             helper=self.infer_helper,
             initial_state=self.encoder_state,
             output_layer=self.projection_layer)
@@ -245,9 +260,28 @@ class EncoderDecoder(object):
         # Dynamic decoding
         (self.infer_outputs, _ , _ ) = tf.contrib.seq2seq.dynamic_decode(
                 self.infer_decoder,
-                maximum_iterations=self.max_sentence_length)
+                maximum_iterations=self.max_sentence_length,
+                output_time_major=False, impute_finished=True)
 
         self.translations = self.infer_outputs.sample_id
+
+        ###############################################################
+        ###############################################################
+        self.infer_logits = self.infer_outputs.rnn_output
+        paddings = [[0, 0], [0, self.max_sentence_length-tf.shape(self.infer_logits)[1]], [0, 0]]
+        self.infer_logits = tf.pad(self.infer_logits, paddings, 'CONSTANT', constant_values=-1)
+
+
+        self.infer_crossent = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                        labels=self.tgt_word_ids, logits=self.infer_logits)
+
+        self.infer_target_weights = tf.sequence_mask(lengths=self.tgt_sentence_lengths,
+                                            maxlen=self.max_sentence_length,
+                                            dtype=tf.float32)
+
+        self.infer_loss = (tf.reduce_sum(self.infer_crossent * self.infer_target_weights) / self.batch_size)
+        ###############################################################
+        ###############################################################
     # ----------------------------------------------------------- #
 
     # callable for infer_helper
@@ -259,19 +293,22 @@ class EncoderDecoder(object):
 def train_model():
     batches, vocab_size, src_word2id, tgt_word2id = construct_training_data_batches()
 
-    tgt_id2word = ['<emp>'] + list(tgt_word2id.keys())
+    first_batch = batches[0]
+
+    # tgt_id2word = ['<emp>'] + list(tgt_word2id.keys())
+    tgt_id2word = list(tgt_word2id.keys())
 
     params = {'vocab_src_size': vocab_size['src'],
             'vocab_tgt_size': vocab_size['tgt'],
-            'sos_id':  tgt_word2id['<s>'],
+            'go_id':  tgt_word2id['<go>'],
             'eos_id':  tgt_word2id['</s>']}
 
     model = EncoderDecoder(params)
     model.build_network()
 
-    use_gpu = False
+    use_gpu = True
 
-    if use_gpu == True:
+    if not use_gpu:
         os.environ['CUDA_VISIBLE_DEVICES'] = ''
         sess_config = tf.ConfigProto()
     else:
@@ -282,6 +319,9 @@ def train_model():
     # sess = tf.Session(config=sess_config) # sess.close() / sess.run()
     with tf.Session(config=sess_config) as sess:
         sess.run(tf.global_variables_initializer())
+        tf_variables = tf.trainable_variables()
+        for i in range(len(tf_variables)):
+            print(tf_variables[i])
 
         for epoch in range(40):
             print("num_batches = ", len(batches))
@@ -293,29 +333,59 @@ def train_model():
                             model.tgt_sentence_lengths: batch['tgt_sentence_lengths']}
 
                 # pdb.set_trace()
-                train_loss, _ = sess.run([model.train_loss, model.train_op], feed_dict=feed_dict)
+                train_logits, train_src_word_ids, my_embedding, train_src_embedded, train_enc_state, train_loss, _ = sess.run([model.logits, model.src_word_ids, model.src_word_embeddings, model.src_embedded, model.encoder_state, model.train_loss, model.train_op], feed_dict=feed_dict)
+                # sentence 4 #
+                logits4 = train_logits[4]
+                sentence4_out = [tgt_id2word[id] for id in np.argmax(logits4, axis=1)]
+                sentence4_in  = [tgt_id2word[id] for id in train_src_word_ids[4]]
+                # pdb.set_trace()
+                # print(' '.join(sentence4))
+
+
                 # [aa] = sess.run([model.s], feed_dict=feed_dict)
                 # pdb.set_trace()
                 if i % 10 == 0:
-                    print("batch: {} --- train_loss: {}".format(i, train_loss))
+                    # print("batch: {} --- train_loss: {}".format(i, train_loss))
 
                     # --------------------------------------------------- #
-                    my_sentence1 = '<s> They wrote almost a thousand pages on the topic . </s>'
+
+                    infer_dict = { model.src_word_ids: batch['src_word_ids'],
+                                model.tgt_word_ids: batch['tgt_word_ids'],
+                                model.src_sentence_lengths: batch['src_sentence_lengths'],
+                                model.tgt_sentence_lengths: batch['tgt_sentence_lengths']}
+
+                    [inf_src_embedded, inf_enc_state, my_translations, infer_loss] = sess.run([model.src_embedded, model.encoder_state, model.translations, model.infer_loss], feed_dict=infer_dict)
+
+                    print("batch: {} --- train_loss: {:.5f} | inf_loss: {:.5f}".format(i, train_loss, infer_loss))
+
+                    # --------------------------------------------------- #
+
+                if i % 50 == 0:
+                    # --------------------------------------------------- #
+                    my_sentences = ['They wrote almost a thousand pages on the topic . </s>',
+                                    'And it takes weeks to perform our integrations . </s>',
+                                    'It was terribly dangerous . </s>',
+                                    'This is a fourth alternative that you are soon going to have . </s>']
                     my_sent_ids = []
 
-                    for word in my_sentence1.split():
-                        if word in src_word2id:
-                            my_sent_ids.append(src_word2id[word])
-                        else:
-                            my_sent_ids.append(src_word2id['<unk>'])
+                    for my_sentence in my_sentences:
+                        ids = []
+                        for word in my_sentence.split():
+                            if word in src_word2id:
+                                ids.append(src_word2id[word])
+                            else:
+                                ids.append(src_word2id['<unk>'])
+                        my_sent_ids.append(ids)
 
-                    infer_dict = {model.src_word_ids: [my_sent_ids],
-                                model.src_sentence_lengths: [len(my_sent_ids)]}
+                    my_sent_len = [len(my_sent) for my_sent in my_sent_ids]
+                    my_sent_ids = [ids + [src_word2id['</s>']]*(32-len(ids)) for ids in my_sent_ids]
+
+
+                    infer_dict = {model.src_word_ids: my_sent_ids,
+                                model.src_sentence_lengths: my_sent_len}
 
                     [my_translations] = sess.run([model.translations], feed_dict=infer_dict)
-
                     # pdb.set_trace()
-
                     for my_sent in my_translations:
                         my_words = [tgt_id2word[id] for id in my_sent]
                         print(' '.join(my_words))
