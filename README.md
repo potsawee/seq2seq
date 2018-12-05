@@ -14,11 +14,11 @@ Encoder&Decoder for GED/GEC experiments
 --------------------------------------
 Training:
 
-    python /home/alta/BLTSpeaking/ged-pm574/local/seq2seq/train.py \
-        --train_src local/seq2seq/data/iwslt15/train.en \
-        --train_tgt local/seq2seq/data/iwslt15/train.en \
-        --vocab_src local/seq2seq/data/iwslt15/vocab.en \
-        --vocab_tgt local/seq2seq/data/iwslt15/vocab.en \
+    python train.py \
+        --train_src data/iwslt15/train.en \
+        --train_tgt data/iwslt15/train.en \
+        --vocab_src data/iwslt15/vocab.en \
+        --vocab_tgt data/iwslt15/vocab.en \
         --save lib/models/tmp0 \
         --embedding_size 200 \
         --num_units 128 \
