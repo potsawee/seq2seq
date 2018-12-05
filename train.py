@@ -2,6 +2,7 @@ import os
 import collections
 import numpy as np
 import tensorflow as tf
+import argparse
 import pdb
 
 from model import EncoderDecoder
@@ -9,6 +10,38 @@ from model import EncoderDecoder
 '''
 Training the Encoder Decoder model
 '''
+
+def add_arguments(parser):
+    '''Build Argument Parser'''
+    parser.register("type", "bool", lambda v: v.lower() == "true")
+
+    # file paths
+    parser.add_argument('--train_src', type=str, required=True)
+    parser.add_argument('--train_tgt', type=str, required=True)
+    parser.add_argument('--vocab_src', type=str, required=True)
+    parser.add_argument('--vocab_tgt', type=str, required=True)
+    parser.add_argument('--save', type=str, required=True) # path to save model
+    parser.add_argument('--load', type=str, default=None)  # path to load model
+
+    # network architecture
+    parser.add_argument('--embedding_size', type=int, default=200)
+    parser.add_argument('--num_units', type=int, default=128)
+
+    # hyperpaprameters
+    parser.add_argument('--learning_rate', type=float, default=0.01)
+    parser.add_argument('--batch_size', type=int, default=256)
+
+    # training settings
+    parser.add_argument('--num_epochs', type=int, default=20)
+
+    # data
+    parser.add_argument('--max_sentence_length', type=int, default=32)
+
+    # other settings
+    parser.add_argument("--use_gpu", type="bool", nargs="?", const=True, default=False)
+
+    return parser
+
 
 def load_vocab(paths):
     with open(paths['vocab_src']) as file:
@@ -43,17 +76,25 @@ def load_data(paths):
         train_tgt_sentences = file.readlines()
 
     assert (len(train_src_sentences) == len(train_tgt_sentences)), "train_source != train_target"
-    print("num_training_sentences: ", len(train_src_sentences))
+    # print("num_training_sentences: ", len(train_src_sentences))
 
     return train_src_sentences, train_tgt_sentences
 
-def construct_training_data_batches(batch_size):
-    train_src = 'data/iwslt15/train.en'
-    train_tgt = 'data/iwslt15/train.en'
-    # train_src = 'data/iwslt15/mytrain3.en'
-    # train_tgt = 'data/iwslt15/mytrain3.vi'
-    vocab_src = 'data/iwslt15/vocab.en'
-    vocab_tgt = 'data/iwslt15/vocab.en'
+def construct_training_data_batches(config):
+    # train_src = 'data/iwslt15/train.en'
+    # train_tgt = 'data/iwslt15/train.en'
+    # # train_src = 'data/iwslt15/mytrain3.en'
+    # # train_tgt = 'data/iwslt15/mytrain3.vi'
+    # vocab_src = 'data/iwslt15/vocab.en'
+    # vocab_tgt = 'data/iwslt15/vocab.en'
+
+    train_src = config['train_src']
+    train_tgt = config['train_tgt']
+    vocab_src = config['vocab_src']
+    vocab_tgt = config['vocab_tgt']
+
+    batch_size = config['batch_size']
+    max_sentence_length = config['max_sentence_length']
 
     vocab_paths = {'vocab_src': vocab_src, 'vocab_tgt': vocab_tgt}
     data_paths = {'train_src': train_src, 'train_tgt': train_tgt}
@@ -62,9 +103,6 @@ def construct_training_data_batches(batch_size):
     train_src_sentences, train_tgt_sentences = load_data(data_paths)
 
     vocab_size = {'src': len(src_word2id), 'tgt': len(tgt_word2id)}
-    num_training_sentences = len(train_src_sentences)
-
-    max_sentence_length = 32
 
     train_src_word_ids = [] # num_sentences x max_sentence_length
     train_tgt_word_ids = [] # num_sentences x max_sentence_length
@@ -104,19 +142,35 @@ def construct_training_data_batches(batch_size):
         train_tgt_sentence_lengths.append(len(words)+1) # include one EOS
 
 
+    assert (len(train_src_word_ids) == len(train_tgt_word_ids)), "train_src_word_ids != train_src_word_ids"
+    num_training_sentences = len(train_src_word_ids)
+    print("num_training_sentences: ", num_training_sentences) # only those that are not too long
+
     batches = []
-    for i in range(int(num_training_sentences/batch_size)-1):
-        batch = {'src_word_ids': train_src_word_ids[i:i+batch_size],
-            'tgt_word_ids': train_tgt_word_ids[i:i+batch_size],
-            'src_sentence_lengths': train_src_sentence_lengths[i:i+batch_size],
-            'tgt_sentence_lengths': train_tgt_sentence_lengths[i:i+batch_size]}
+
+    for i in range(int(num_training_sentences/batch_size)):
+        i_start = i * batch_size
+        i_end = i_start + batch_size
+        batch = {'src_word_ids': train_src_word_ids[i_start:i_end],
+            'tgt_word_ids': train_tgt_word_ids[i_start:i_end],
+            'src_sentence_lengths': train_src_sentence_lengths[i_start:i_end],
+            'tgt_sentence_lengths': train_tgt_sentence_lengths[i_start:i_end]}
 
         batches.append(batch)
 
     return batches, vocab_size, src_word2id, tgt_word2id
 
-def train():
-    batches, vocab_size, src_word2id, tgt_word2id = construct_training_data_batches(batch_size=256)
+def train(config):
+    # --------- configurations --------- #
+    batch_size = config['batch_size']
+    save_path = config['save'] # path to store model
+    saved_model = config['load'] # None or path
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    # ---------------------------------- #
+    write_config(save_path+'/config.txt', config)
+
+    batches, vocab_size, src_word2id, tgt_word2id = construct_training_data_batches(config)
 
     tgt_id2word = list(tgt_word2id.keys())
 
@@ -125,25 +179,20 @@ def train():
             'go_id':  tgt_word2id['<go>'],
             'eos_id':  tgt_word2id['</s>']}
 
-    model = EncoderDecoder(params)
+    model = EncoderDecoder(config, params)
     model.build_network()
-
-    use_gpu = True
 
     # save & restore model
     saver = tf.train.Saver(max_to_keep=2)
-    save_path = '/home/alta/BLTSpeaking/ged-pm574/local/seq2seq/save/en-v2/model'
-    # saved_model = save_path + '-1'
-    saved_model = None
 
-    if use_gpu:
+    if config['use_gpu']:
         if 'X_SGE_CUDA_DEVICE' in os.environ:
             cuda_device = os.environ['X_SGE_CUDA_DEVICE']
             print('X_SGE_CUDA_DEVICE is set to {}'.format(cuda_device))
             os.environ['CUDA_VISIBLE_DEVICES'] = cuda_device
 
         else: # development only e.g. air202
-            os.environ['CUDA_VISIBLE_DEVICES'] = '0' # choose the device (GPU) here
+            os.environ['CUDA_VISIBLE_DEVICES'] = '1' # choose the device (GPU) here
 
         sess_config = tf.ConfigProto(allow_soft_placement=True)
         sess_config.gpu_options.allow_growth = True # Whether the GPU memory usage can grow dynamically.
@@ -169,7 +218,7 @@ def train():
         # for i in range(len(tf_variables)):
         #     print(tf_variables[i])
 
-        num_epochs = 10
+        num_epochs = config['num_epochs']
         for epoch in range(num_epochs):
             print("num_batches = ", len(batches))
             for i, batch in enumerate(batches):
@@ -211,7 +260,7 @@ def train():
                         my_sent_ids.append(ids)
 
                     my_sent_len = [len(my_sent) for my_sent in my_sent_ids]
-                    my_sent_ids = [ids + [src_word2id['</s>']]*(32-len(ids)) for ids in my_sent_ids]
+                    my_sent_ids = [ids + [src_word2id['</s>']]*(config['max_sentence_length']-len(ids)) for ids in my_sent_ids]
 
 
                     infer_dict = {model.src_word_ids: my_sent_ids,
@@ -225,11 +274,22 @@ def train():
 
 
             print("################## EPOCH {} done ##################".format(epoch))
-            saver.save(sess, save_path, global_step=epoch)
+            saver.save(sess, save_path + '/model', global_step=epoch)
+
+def write_config(path, config):
+    with open(path, 'w') as file:
+        for x in config:
+            file.write('{}={}\n'.format(x, config[x]))
+    print('write config done')
 
 
 def main():
-    train()
+    # get configurations from the terminal
+    parser = argparse.ArgumentParser()
+    parser = add_arguments(parser)
+    args = vars(parser.parse_args())
+
+    train(config=args)
 
 if __name__ == '__main__':
     main()
