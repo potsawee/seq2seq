@@ -1,8 +1,8 @@
 
-Seq2Seq Model - Encoder&Decoder for GED/GEC experiments
+Seq2Seq Model
 =====================================================
 
-Machine Translation for GE corruption
+Encoder&Decoder for GED/GEC experiments
 -------------------------------------- 
 	
 
