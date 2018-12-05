@@ -7,13 +7,13 @@ Encoder-Decoder architecture
 '''
 
 class EncoderDecoder(object):
-    def __init__(self, params):
+    def __init__(self, config, params):
         # hyper-parameters / configurations
-        self.learning_rate = 0.01
-        self.batch_size = 256
-        self.embedding_size = 200
-        self.num_units = 128
-        self.max_sentence_length = 32
+        self.learning_rate = config['learning_rate']
+        self.batch_size = config['batch_size']
+        self.embedding_size = config['embedding_size']
+        self.num_units = config['num_units']
+        self.max_sentence_length = config['max_sentence_length']
         self.params = params
 
 
