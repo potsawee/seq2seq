@@ -1,0 +1,6 @@
+To enable TensorFlow GPU:
+    source /home/miproj/urop.2018/pm574/anaconda3/bin/activate tf_gpu
+To enable TensorFlow CPU:
+    source /home/miproj/urop.2018/pm574/anaconda3/bin/activate tf_cpu
+To disable the environment:
+    conda deactivate
