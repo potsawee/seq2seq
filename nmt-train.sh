@@ -21,8 +21,10 @@ $PYTHONBIN /home/alta/BLTSpeaking/ged-pm574/local/seq2seq/train.py \
     --vocab_src local/seq2seq/data/iwslt15/vocab.en \
     --vocab_tgt local/seq2seq/data/iwslt15/vocab.en \
     --embedding_size 200 \
+    --num_layers 2 \
+    --dropout 0.2 \
     --num_units 128 \
-    --learning_rate 0.001 \
+    --learning_rate 0.005 \
     --batch_size 256 \
     --num_epochs 100 \
     --max_sentence_length 32 \

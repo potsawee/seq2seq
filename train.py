@@ -26,10 +26,12 @@ def add_arguments(parser):
 
     # network architecture
     parser.add_argument('--embedding_size', type=int, default=200)
+    parser.add_argument('--num_layers', type=int, default=2)
     parser.add_argument('--num_units', type=int, default=128)
 
     # hyperpaprameters
     parser.add_argument('--learning_rate', type=float, default=0.01)
+    parser.add_argument('--dropout', type=float, default=0.0)
     parser.add_argument('--batch_size', type=int, default=256)
 
     # training settings
