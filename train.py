@@ -1,4 +1,5 @@
 import os
+import sys
 import collections
 import numpy as np
 import tensorflow as tf
@@ -187,11 +188,13 @@ def train(config):
 
     if config['use_gpu']:
         if 'X_SGE_CUDA_DEVICE' in os.environ:
+            print('running on the stack...')
             cuda_device = os.environ['X_SGE_CUDA_DEVICE']
             print('X_SGE_CUDA_DEVICE is set to {}'.format(cuda_device))
             os.environ['CUDA_VISIBLE_DEVICES'] = cuda_device
 
         else: # development only e.g. air202
+            print('running locally...')
             os.environ['CUDA_VISIBLE_DEVICES'] = '1' # choose the device (GPU) here
 
         sess_config = tf.ConfigProto(allow_soft_placement=True)
@@ -241,6 +244,7 @@ def train(config):
                                                         feed_dict=infer_dict)
 
                     print("batch: {} --- train_loss: {:.5f} | inf_loss: {:.5f}".format(i, train_loss, infer_loss))
+                    sys.stdout.flush()
 
                 if i % 50 == 0:
 

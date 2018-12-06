@@ -12,5 +12,5 @@ endif
 set LOG=$1
 set NMTTRAIN=/home/alta/BLTSpeaking/ged-pm574/local/seq2seq/nmt-train.sh
 
-set CMD = `qsub -cwd -j yes -o $LOG -P esol -l qp=cuda_low -l osrel='*' -l mem_grab=60G -l mem_free=60G  $NMTTRAIN`
+set CMD = `qsub -cwd -j yes -o $LOG -P esol -l qp=cuda-low -l gpuclass='*' -l osrel='*' $NMTTRAIN`
 echo $CMD
