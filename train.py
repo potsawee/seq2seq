@@ -231,7 +231,8 @@ def train(config):
                 feed_dict = { model.src_word_ids: batch['src_word_ids'],
                             model.tgt_word_ids: batch['tgt_word_ids'],
                             model.src_sentence_lengths: batch['src_sentence_lengths'],
-                            model.tgt_sentence_lengths: batch['tgt_sentence_lengths']}
+                            model.tgt_sentence_lengths: batch['tgt_sentence_lengths'],
+                            model.dropout: config['dropout']}
 
                 train_loss, _ = sess.run([model.train_loss, model.train_op],
                                     feed_dict=feed_dict)
@@ -240,7 +241,8 @@ def train(config):
                     infer_dict = { model.src_word_ids: batch['src_word_ids'],
                                 model.tgt_word_ids: batch['tgt_word_ids'],
                                 model.src_sentence_lengths: batch['src_sentence_lengths'],
-                                model.tgt_sentence_lengths: batch['tgt_sentence_lengths']}
+                                model.tgt_sentence_lengths: batch['tgt_sentence_lengths'],
+                                model.dropout: 0.0}
 
                     [my_translations, infer_loss] = sess.run([model.translations, model.infer_loss],
                                                         feed_dict=infer_dict)
@@ -270,7 +272,8 @@ def train(config):
 
 
                     infer_dict = {model.src_word_ids: my_sent_ids,
-                                model.src_sentence_lengths: my_sent_len}
+                                model.src_sentence_lengths: my_sent_len,
+                                model.dropout: 0.0}
 
                     [my_translations] = sess.run([model.translations], feed_dict=infer_dict)
                     # pdb.set_trace()
