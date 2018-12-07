@@ -12,6 +12,7 @@ class EncoderDecoder(object):
         self.learning_rate = config['learning_rate']
         self.batch_size = config['batch_size']
         self.embedding_size = config['embedding_size']
+        self.num_layers = config['num_layers']
         self.num_units = config['num_units']
         self.max_sentence_length = config['max_sentence_length']
         self.params = params
@@ -28,6 +29,8 @@ class EncoderDecoder(object):
         self.tgt_word_ids = tf.placeholder(tf.int32, [None, None], name="tgt_word_ids")
         self.src_sentence_lengths = tf.placeholder(tf.int32, [None], name="src_sentence_lengths")
         self.tgt_sentence_lengths = tf.placeholder(tf.int32, [None], name="tgt_sentence_lengths")
+
+        self.dropout = tf.placeholder(tf.float32, name="dropout")
 
         ############################## padding <go> ##############################
         go_id = self.params['go_id']
@@ -51,39 +54,78 @@ class EncoderDecoder(object):
         s = tf.shape(self.src_word_ids) # s[0] = batch_size , s[1] = max_sentecce_length
 
         ############################## Encoder ##############################
-        # Build an RNN
+        # For bi-directional model the encoder effectively has double layers
+        assert (self.num_layers % 2 == 0), "num_layers must be even"
+        num_bi_encoder_layers = int(self.num_layers / 2)
+        # ----- forward ----- #
+        cell_list = []
+        for i in range(num_bi_encoder_layers):
+            single_cell = self.build_single_cell(self.num_units, self.dropout)
+            cell_list.append(single_cell)
 
-        dropout_lstm_cell1 = tf.nn.rnn_cell.DropoutWrapper(
-                        cell=tf.nn.rnn_cell.LSTMCell(self.num_units, state_is_tuple=True),
-                        input_keep_prob=1.0,
-                        output_keep_prob=1.0,
-                        state_keep_prob=1.0)
+        if num_bi_encoder_layers == 1:
+            self.fw_encoder_cell = cell_list[0]
+        elif num_bi_encoder_layers > 1:
+            self.fw_encoder_cell = tf.nn.rnn_cell.MultiRNNCell(cell_list)
+        else:
+            raise ValueError('num_layers error')
+        # ----- backward ----- #
+        cell_list = []
+        for i in range(num_bi_encoder_layers):
+            single_cell = self.build_single_cell(self.num_units, self.dropout)
+            cell_list.append(single_cell)
 
-
-        encoder_lstm_cells = [dropout_lstm_cell1, tf.nn.rnn_cell.LSTMCell(self.num_units, state_is_tuple=True)]
-
-        self.stacked_encoder_cell = tf.nn.rnn_cell.MultiRNNCell(encoder_lstm_cells)
+        if num_bi_encoder_layers == 1:
+            self.bw_encoder_cell = cell_list[0]
+        elif num_bi_encoder_layers > 1:
+            self.bw_encoder_cell = tf.nn.rnn_cell.MultiRNNCell(cell_list)
+        else:
+            raise ValueError('num_layers error')
 
         # Build a dynamic RNN
         #   encoder_outputs: [batch_size, max_time, num_units]
         #   encoder_state:   [batch_size, num_units]  -> final state
-        self.encoder_outputs, self.encoder_state = tf.nn.dynamic_rnn(
-                                            self.stacked_encoder_cell, self.src_embedded,
-                                            sequence_length=self.src_sentence_lengths,
-                                            initial_state=self.stacked_encoder_cell.zero_state(s[0],dtype=tf.float32),
-                                            time_major=False)
+        # self.encoder_outputs, self.encoder_state = tf.nn.dynamic_rnn(
+        #                                     self.encoder_cell, self.src_embedded,
+        #                                     sequence_length=self.src_sentence_lengths,
+        #                                     initial_state=self.encoder_cell.zero_state(s[0],dtype=tf.float32),
+        #                                     time_major=False)
+
+        # Bi-directional RNN
+        self.bi_encoder_outputs, self.bi_encoder_state = tf.nn.bidirectional_dynamic_rnn(
+                self.fw_encoder_cell, self.bw_encoder_cell,
+                self.src_embedded,
+                sequence_length=self.src_sentence_lengths,
+                initial_state_fw=self.fw_encoder_cell.zero_state(s[0],dtype=tf.float32),
+                initial_state_bw=self.bw_encoder_cell.zero_state(s[0],dtype=tf.float32),
+                time_major=False)
+
+        self.encoder_outputs = tf.concat(self.bi_encoder_outputs, -1)
+
+        if num_bi_encoder_layers == 1:
+            self.encoder_state = self.bi_encoder_state
+        elif num_bi_encoder_layers > 1:
+            # alternatively concat forward and backward states
+            encoder_state = []
+            for i in range(num_bi_encoder_layers):
+                encoder_state.append(self.bi_encoder_state[0][i])  # forward
+                encoder_state.append(self.bi_encoder_state[1][i])  # backward
+            self.encoder_state = tuple(encoder_state)
+        else:
+            raise ValueError('num_layers error')
 
         ############################## Decoder ##############################
-        # Build an RNN Cell
-        dropout_lstm_cell2 = tf.nn.rnn_cell.DropoutWrapper(
-                        cell=tf.nn.rnn_cell.LSTMCell(self.num_units, state_is_tuple=True),
-                        input_keep_prob=1.0,
-                        output_keep_prob=1.0,
-                        state_keep_prob=1.0)
+        cell_list = []
+        for i in range(self.num_layers):
+            single_cell = self.build_single_cell(self.num_units, self.dropout)
+            cell_list.append(single_cell)
 
-        decoder_lstm_cells = [dropout_lstm_cell2, tf.nn.rnn_cell.LSTMCell(self.num_units, state_is_tuple=True)]
-
-        self.stacked_decoder_cell = tf.nn.rnn_cell.MultiRNNCell(decoder_lstm_cells)
+        if self.num_layers == 1:
+            self.decoder_cell = cell_list[0]
+        elif self.num_layers > 1:
+            self.decoder_cell = tf.nn.rnn_cell.MultiRNNCell(cell_list)
+        else:
+            raise ValueError('num_layers error')
 
         # -------------------- Training -------------------- #
 
@@ -97,7 +139,7 @@ class EncoderDecoder(object):
         self.projection_layer = tf.layers.Dense(self.params['vocab_tgt_size'], use_bias=True)
 
         self.train_decoder = tf.contrib.seq2seq.BasicDecoder(
-                    cell=self.stacked_decoder_cell, helper=self.train_helper,
+                    cell=self.decoder_cell, helper=self.train_helper,
                     initial_state=self.encoder_state,
                     output_layer=self.projection_layer)
 
@@ -115,7 +157,7 @@ class EncoderDecoder(object):
                 end_token=self.params['eos_id'])
 
         self.infer_decoder = tf.contrib.seq2seq.BasicDecoder(
-            cell=self.stacked_decoder_cell,
+            cell=self.decoder_cell,
             helper=self.infer_helper,
             initial_state=self.encoder_state,
             output_layer=self.projection_layer)
@@ -171,3 +213,11 @@ class EncoderDecoder(object):
     # callable for infer_helper
     def embedding_decoder(self, ids):
         return tf.nn.embedding_lookup(self.tgt_word_embeddings, ids)
+
+    # methods for build the network
+    def build_single_cell(self, num_units, dropout):
+        '''build a single cell'''
+        # LSTM cell
+        single_cell = tf.nn.rnn_cell.LSTMCell(num_units, state_is_tuple=True)
+        single_cell = tf.nn.rnn_cell.DropoutWrapper(cell=single_cell, input_keep_prob=1.0-dropout)
+        return single_cell
