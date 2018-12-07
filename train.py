@@ -1,7 +1,8 @@
 import os
 import sys
 import collections
-import numpy as np
+import random
+# import numpy as np
 import tensorflow as tf
 import argparse
 import pdb
@@ -36,6 +37,7 @@ def add_arguments(parser):
 
     # training settings
     parser.add_argument('--num_epochs', type=int, default=20)
+    parser.add_argument('--random_seed', type=int, default=25)
 
     # data
     parser.add_argument('--max_sentence_length', type=int, default=32)
@@ -116,38 +118,42 @@ def construct_training_data_batches(config):
     src_eos_id = src_word2id['</s>']
     tgt_eos_id = tgt_word2id['</s>']
 
-    # Source sentence
-    for sentence in train_src_sentences:
-        words = sentence.split()
-        if len(words) > max_sentence_length:
+    # Source and Target sentences
+    for src_sentence, tgt_sentence in zip(train_src_sentences, train_tgt_sentences):
+        src_words = src_sentence.split()
+        tgt_words = tgt_sentence.split()
+
+        if len(src_words) > max_sentence_length or len(tgt_words) > max_sentence_length:
             continue
-        ids = [src_eos_id] * max_sentence_length
-        for i, word in enumerate(words):
+
+        # source
+        src_ids = [src_eos_id] * max_sentence_length
+        for i, word in enumerate(src_words):
             if word in src_word2id:
-                ids[i] = src_word2id[word]
+                src_ids[i] = src_word2id[word]
             else:
-                ids[i] = src_word2id['<unk>']
-        train_src_word_ids.append(ids)
-        train_src_sentence_lengths.append(len(words)+1) # include one EOS
+                src_ids[i] = src_word2id['<unk>']
+        train_src_word_ids.append(src_ids)
+        train_src_sentence_lengths.append(len(src_words)+1) # include one EOS
 
-    # Target sentence
-    for sentence in train_tgt_sentences:
-        words = sentence.split()
-        if len(words) > max_sentence_length:
-            continue
-        ids = [tgt_eos_id] * max_sentence_length
-        for i, word in enumerate(words):
+        # target
+        tgt_ids = [tgt_eos_id] * max_sentence_length
+        for i, word in enumerate(tgt_words):
             if word in tgt_word2id:
-                ids[i] = tgt_word2id[word]
+                tgt_ids[i] = tgt_word2id[word]
             else:
-                ids[i] = tgt_word2id['<unk>']
-        train_tgt_word_ids.append(ids)
-        train_tgt_sentence_lengths.append(len(words)+1) # include one EOS
-
+                tgt_ids[i] = tgt_word2id['<unk>']
+        train_tgt_word_ids.append(tgt_ids)
+        train_tgt_sentence_lengths.append(len(tgt_words)+1) # include one EOS
 
     assert (len(train_src_word_ids) == len(train_tgt_word_ids)), "train_src_word_ids != train_src_word_ids"
     num_training_sentences = len(train_src_word_ids)
     print("num_training_sentences: ", num_training_sentences) # only those that are not too long
+
+    # shuffle
+    _x = list(zip(train_src_word_ids, train_tgt_word_ids, train_src_sentence_lengths, train_tgt_sentence_lengths))
+    random.shuffle(_x)
+    train_src_word_ids, train_tgt_word_ids, train_src_sentence_lengths, train_tgt_sentence_lengths = zip(*_x)
 
     batches = []
 
@@ -172,6 +178,10 @@ def train(config):
         os.makedirs(save_path)
     # ---------------------------------- #
     write_config(save_path+'/config.txt', config)
+
+    # random seed
+    random.seed(config['random_seed'])
+    # np.random.seed(config['random_seed'])
 
     batches, vocab_size, src_word2id, tgt_word2id = construct_training_data_batches(config)
 
@@ -226,6 +236,9 @@ def train(config):
         num_epochs = config['num_epochs']
         for epoch in range(num_epochs):
             print("num_batches = ", len(batches))
+
+            random.shuffle(batches)
+
             for i, batch in enumerate(batches):
 
                 feed_dict = { model.src_word_ids: batch['src_word_ids'],
