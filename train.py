@@ -1,6 +1,5 @@
 import os
 import sys
-import collections
 import random
 # import numpy as np
 import tensorflow as tf
@@ -8,6 +7,7 @@ import argparse
 import pdb
 
 from model import EncoderDecoder
+from helper import load_vocab, load_data, write_config
 
 '''
 Training the Encoder Decoder model
@@ -48,44 +48,6 @@ def add_arguments(parser):
     parser.add_argument("--use_gpu", type="bool", nargs="?", const=True, default=False)
 
     return parser
-
-
-def load_vocab(paths):
-    with open(paths['vocab_src']) as file:
-        vocab_src = file.readlines()
-    with open(paths['vocab_tgt']) as file:
-        vocab_tgt = file.readlines()
-
-    print("num_vocab_src: ", len(vocab_src))
-    print("num_vocab_tgt: ", len(vocab_tgt))
-
-    src_word2id = collections.OrderedDict()
-    tgt_word2id = collections.OrderedDict()
-
-    for i, word in enumerate(vocab_src):
-        word = word.strip() # remove \n
-        src_word2id[word] = i
-
-    for i, word in enumerate(vocab_tgt):
-        word = word.strip() # remove \n
-        tgt_word2id[word] = i
-
-    # -------------- Special Tokens -------------- #
-    # <go> <unk> </s> are defined in the vocab list
-    # -------------------------------------------- #
-
-    return src_word2id, tgt_word2id
-
-def load_data(paths):
-    with open(paths['train_src']) as file:
-        train_src_sentences = file.readlines()
-    with open(paths['train_tgt']) as file:
-        train_tgt_sentences = file.readlines()
-
-    assert (len(train_src_sentences) == len(train_tgt_sentences)), "train_source != train_target"
-    # print("num_training_sentences: ", len(train_src_sentences))
-
-    return train_src_sentences, train_tgt_sentences
 
 def construct_training_data_batches(config):
     # train_src = 'data/iwslt15/train.en'
@@ -299,13 +261,6 @@ def train(config):
 
             print("################## EPOCH {} done ##################".format(epoch))
             saver.save(sess, save_path + '/model', global_step=epoch)
-
-def write_config(path, config):
-    with open(path, 'w') as file:
-        for x in config:
-            file.write('{}={}\n'.format(x, config[x]))
-    print('write config done')
-
 
 def main():
     # get configurations from the terminal
