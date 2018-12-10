@@ -14,6 +14,7 @@ class EncoderDecoder(object):
         self.embedding_size = config['embedding_size']
         self.num_layers = config['num_layers']
         self.num_units = config['num_units']
+        self.decoding_method = config['decoding_method']
         self.max_sentence_length = config['max_sentence_length']
         self.params = params
 
@@ -114,6 +115,8 @@ class EncoderDecoder(object):
         else:
             raise ValueError('num_layers error')
 
+
+
         ############################## Decoder ##############################
         cell_list = []
         for i in range(self.num_layers):
@@ -126,6 +129,18 @@ class EncoderDecoder(object):
             self.decoder_cell = tf.nn.rnn_cell.MultiRNNCell(cell_list)
         else:
             raise ValueError('num_layers error')
+
+        # --------------- Attention Mechanism --------------- #
+        # note that previously encoder_outputs is the set of all source 'hidden' states at the top layer
+        self.attention_mechanism = tf.contrib.seq2seq.LuongAttention(
+            num_units=self.num_units,
+            memory=self.encoder_outputs,
+            memory_sequence_length=self.src_sentence_lengths)
+
+        self.decoder_cell = tf.contrib.seq2seq.AttentionWrapper(
+            cell=self.decoder_cell,
+            attention_mechanism=self.attention_mechanism,
+            attention_layer_size=self.num_units)
 
         # -------------------- Training -------------------- #
 
@@ -140,7 +155,7 @@ class EncoderDecoder(object):
 
         self.train_decoder = tf.contrib.seq2seq.BasicDecoder(
                     cell=self.decoder_cell, helper=self.train_helper,
-                    initial_state=self.encoder_state,
+                    initial_state=self.decoder_cell.zero_state(s[0],dtype=tf.float32),
                     output_layer=self.projection_layer)
 
         # Dynamic decoding
@@ -150,17 +165,40 @@ class EncoderDecoder(object):
         self.logits = self.outputs.rnn_output
 
         # -------------------- Inference -------------------- #
-        # Inference Helper
-        self.infer_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
+        # Inference Helper (1) greedy search (2) beam search
+        if self.decoding_method == 'greedy':
+            self.infer_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
                 embedding=self.embedding_decoder,
                 start_tokens=tf.fill([s[0]], self.params['go_id']),
                 end_token=self.params['eos_id'])
 
-        self.infer_decoder = tf.contrib.seq2seq.BasicDecoder(
-            cell=self.decoder_cell,
-            helper=self.infer_helper,
-            initial_state=self.encoder_state,
-            output_layer=self.projection_layer)
+            self.infer_decoder = tf.contrib.seq2seq.BasicDecoder(
+                cell=self.decoder_cell,
+                helper=self.infer_helper,
+                initial_state=self.decoder_cell.zero_state(s[0],dtype=tf.float32),
+                output_layer=self.projection_layer)
+
+        # elif self.decoding_method == 'beam':
+            # beam_width = 10
+            # # Replicate encoder infos beam_width times
+            # decoder_initial_state = tf.contrib.seq2seq.tile_batch(
+            #     self.decoder_cell.zero_state(s[0],dtype=tf.float32),
+            #     multiplier=beam_width) # set beam width = 10
+            #
+            # # Define a beam-search decoder
+            # self.infer_decoder = tf.contrib.seq2seq.BeamSearchDecoder(
+            #     cell=self.decoder_cell,
+            #     embedding=self.embedding_decoder,
+            #     start_tokens=tf.fill([s[0]], self.params['go_id']),
+            #     end_token=self.params['eos_id'],
+            #     initial_state=decoder_initial_state,
+            #     beam_width=beam_width,
+            #     output_layer=self.projection_layer,
+            #     length_penalty_weight=0.0)
+
+        else:
+            raise ValueError('decoding method error: only GreedySearch or BeamSearch')
+
 
         # Dynamic decoding
         (self.infer_outputs, _ , _ ) = tf.contrib.seq2seq.dynamic_decode(
@@ -169,6 +207,12 @@ class EncoderDecoder(object):
                 output_time_major=False, impute_finished=True)
 
         self.translations = self.infer_outputs.sample_id
+
+        # 0 time
+        # 1 batch_size
+        # 2 beam_width
+        # if self.decoding_method == 'beam':
+        #     self.translations
 
         ############################## Calculating Loss ##############################
         # -------------------- Training -------------------- #
