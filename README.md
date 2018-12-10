@@ -15,10 +15,10 @@ Encoder&Decoder for GED/GEC experiments
 Training:
 
     python train.py \
-        --train_src local/seq2seq/data/iwslt15/train.en \
-        --train_tgt local/seq2seq/data/iwslt15/train.vi \
-        --vocab_src local/seq2seq/data/iwslt15/vocab.en \
-        --vocab_tgt local/seq2seq/data/iwslt15/vocab.vi \
+        --train_src lib/data/source.txt \
+        --train_tgt lib/data/target.txt \
+        --vocab_src lib/wlists/source.txt \
+        --vocab_tgt lib/wlists/target.txt \
         --embedding_size 200 \
         --num_layers 2 \
         --dropout 0.2 \
