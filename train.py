@@ -38,6 +38,8 @@ def add_arguments(parser):
     # training settings
     parser.add_argument('--num_epochs', type=int, default=20)
     parser.add_argument('--random_seed', type=int, default=25)
+    parser.add_argument('--decoding_method', type=str, default='greedy')
+
 
     # data
     parser.add_argument('--max_sentence_length', type=int, default=32)

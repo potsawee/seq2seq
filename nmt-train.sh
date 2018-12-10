@@ -24,9 +24,11 @@ $PYTHONBIN /home/alta/BLTSpeaking/ged-pm574/local/seq2seq/train.py \
     --num_layers 2 \
     --dropout 0.2 \
     --num_units 128 \
-    --learning_rate 0.005 \
+    --learning_rate 0.001 \
     --batch_size 256 \
     --num_epochs 100 \
+    --random_seed 25 \
+    --decoding_method greedy \
     --max_sentence_length 32 \
     --use_gpu True \
-    --save lib/models/en-test
+    --save lib/models/tmp0
