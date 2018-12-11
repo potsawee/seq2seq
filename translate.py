@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import tensorflow as tf
 import argparse
 import pdb
@@ -34,6 +35,11 @@ def src_data(srcfile, src_word2id, max_sentence_length):
                 ids.append(src_word2id['<unk>'])
         src_sent_ids.append(ids)
 
+    # check if each sentence is too long
+    for i in range(len(src_sent_ids)):
+        if len(src_sent_ids[i]) > max_sentence_length:
+            src_sent_ids[i] = src_sent_ids[i][:max_sentence_length]
+
     src_sent_len = [len(sent) for sent in src_sent_ids]
     src_sent_ids = [ids + [src_word2id['</s>']]*(max_sentence_length-len(ids)) for ids in src_sent_ids]
 
@@ -67,7 +73,7 @@ def translate(config):
     with tf.Session(config=sess_config) as sess:
         # Restore variables from disk.
         saver.restore(sess, full_save_path_to_model)
-        print("Model restored")
+        # print("Model restored")
 
         src_sent_ids, src_sent_len = src_data(config['srcfile'], src_word2id, config['max_sentence_length'])
 
@@ -78,10 +84,14 @@ def translate(config):
         [translations] = sess.run([model.translations], feed_dict=translate_dict)
 
         for translation in translations:
-            words = [tgt_id2word[id] for id in translation]
+            words = []
+            for id in translation:
+                if id == params['eos_id']:
+                    break
+                words.append(tgt_id2word[id])
             print(' '.join(words))
 
-        print('translation done!')
+        # print('translation done!')
 
 def main():
     # get configurations from the terminal
