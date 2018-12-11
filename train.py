@@ -72,6 +72,8 @@ def construct_training_data_batches(config):
     train_src_sentences, train_tgt_sentences = load_data(data_paths)
 
     vocab_size = {'src': len(src_word2id), 'tgt': len(tgt_word2id)}
+    print("num_vocab_src: ", vocab_size['src'])
+    print("num_vocab_tgt: ", vocab_size['tgt'])
 
     train_src_word_ids = [] # num_sentences x max_sentence_length
     train_tgt_word_ids = [] # num_sentences x max_sentence_length
@@ -160,7 +162,7 @@ def train(config):
     model.build_network()
 
     # save & restore model
-    saver = tf.train.Saver(max_to_keep=2)
+    saver = tf.train.Saver(max_to_keep=1)
 
     if config['use_gpu']:
         if 'X_SGE_CUDA_DEVICE' in os.environ:
@@ -229,10 +231,16 @@ def train(config):
 
                 if i % 50 == 0:
 
-                    my_sentences = ['They wrote almost a thousand pages on the topic . </s>',
-                                    'And it takes weeks to perform our integrations . </s>',
-                                    'It was terribly dangerous . </s>',
-                                    'This is a fourth alternative that you are soon going to have . </s>']
+                    # my_sentences = ['They wrote almost a thousand pages on the topic . </s>',
+                    #                 'And it takes weeks to perform our integrations . </s>',
+                    #                 'It was terribly dangerous . </s>',
+                    #                 'This is a fourth alternative that you are soon going to have . </s>']
+                    my_sentences = ['this is a test . </s>',
+                                    'this is to confirm my reservation at your hotel . </s>',
+                                    'playing tennis is good for you . </s>',
+                                    'when talking about successful longterm business relationships customer services are an important element </s>'
+                    ]
+
                     my_sent_ids = []
 
                     for my_sentence in my_sentences:

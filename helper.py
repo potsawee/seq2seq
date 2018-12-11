@@ -10,9 +10,6 @@ def load_vocab(paths):
     with open(paths['vocab_tgt']) as file:
         vocab_tgt = file.readlines()
 
-    print("num_vocab_src: ", len(vocab_src))
-    print("num_vocab_tgt: ", len(vocab_tgt))
-
     src_word2id = collections.OrderedDict()
     tgt_word2id = collections.OrderedDict()
 
@@ -45,7 +42,7 @@ def write_config(path, config):
     with open(path, 'w') as file:
         for x in config:
             file.write('{}={}\n'.format(x, config[x]))
-    print('write config done')
+    # print('write config done')
 
 def read_config(path):
     config = {}
@@ -62,7 +59,7 @@ def read_config(path):
 
             config[key] = val
 
-    print('read config done')
+    # print('read config done')
     return config
 
 def isfloat(value):
