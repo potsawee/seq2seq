@@ -16,6 +16,7 @@ def get_translate_arguments(parser):
     # file paths
     parser.add_argument('--srcfile', type=str, required=True)
     parser.add_argument('--load', type=str, required=True)  # path to load model
+    parser.add_argument('--model_number', type=int, default=None)
 
     return parser
 
@@ -67,7 +68,7 @@ def translate(config):
     # save & restore model
     saver = tf.train.Saver()
     save_path = config['load']
-    model_number = config['num_epochs'] - 1
+    model_number = config['model_number'] if config['model_number'] != None else config['num_epochs'] - 1
     full_save_path_to_model = save_path + '/model-' + str(model_number)
 
     with tf.Session(config=sess_config) as sess:
@@ -103,6 +104,7 @@ def main():
     config = read_config(config_path)
     config['load'] = args['load']
     config['srcfile'] = args['srcfile']
+    config['model_number'] = args['model_number']
 
     translate(config=config)
 
