@@ -1,10 +1,13 @@
 import collections
 
+<<<<<<< HEAD
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.framework import dtypes
 from tensorflow.contrib.seq2seq import SampleEmbeddingHelper
 
+=======
+>>>>>>> 35bd4f2c4754a1bfd90631f93dbc22ab0498bf7f
 '''
 Functions for train & translate
 '''
@@ -73,6 +76,7 @@ def isfloat(value):
     return True
   except ValueError:
     return False
+<<<<<<< HEAD
 
 '''
 Helper classes
@@ -104,3 +108,5 @@ class ModifiedSampleEmbeddingHelper(SampleEmbeddingHelper):
             lambda: self._start_inputs,
             lambda: self._embedding_fn(argmax_ids))
         return (finished, next_inputs, state)
+=======
+>>>>>>> 35bd4f2c4754a1bfd90631f93dbc22ab0498bf7f
