@@ -1,5 +1,6 @@
 import collections
 import tensorflow as tf
+from helper import ModifiedSampleEmbeddingHelper
 import pdb
 
 '''
@@ -165,12 +166,28 @@ class EncoderDecoder(object):
         self.logits = self.outputs.rnn_output
 
         # -------------------- Inference -------------------- #
-        # Inference Helper (1) greedy search (2) beam search
-        if self.decoding_method == 'greedy':
-            self.infer_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
-                embedding=self.embedding_decoder,
-                start_tokens=tf.fill([s[0]], self.params['go_id']),
-                end_token=self.params['eos_id'])
+        # Inference Helper (1) greedy search (2) sample (3) modified-sample (4) beam search
+        if self.decoding_method in ['greedy', 'sample1', 'sample2']:
+            if self.decoding_method == 'greedy':
+                self.infer_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
+                    embedding=self.embedding_decoder,
+                    start_tokens=tf.fill([s[0]], self.params['go_id']),
+                    end_token=self.params['eos_id'])
+
+            elif self.decoding_method == 'sample1':
+                self.infer_helper = tf.contrib.seq2seq.SampleEmbeddingHelper(
+                    embedding=self.embedding_decoder,
+                    start_tokens=tf.fill([s[0]], self.params['go_id']),
+                    end_token=self.params['eos_id'],
+                    softmax_temperature=1.0)
+
+            elif self.decoding_method == 'sample2':
+                """sample to get output & argmax to get element for the next time step"""
+                self.infer_helper = ModifiedSampleEmbeddingHelper(
+                    embedding=self.embedding_decoder,
+                    start_tokens=tf.fill([s[0]], self.params['go_id']),
+                    end_token=self.params['eos_id'],
+                    softmax_temperature=1.0)
 
             self.infer_decoder = tf.contrib.seq2seq.BasicDecoder(
                 cell=self.decoder_cell,
@@ -257,6 +274,11 @@ class EncoderDecoder(object):
     # callable for infer_helper
     def embedding_decoder(self, ids):
         return tf.nn.embedding_lookup(self.tgt_word_embeddings, ids)
+    def argmax_sample(self, outputs):
+        # input: 'outputs'
+        # output: 'sample_ids'
+        sample_ids = tf.math.argmax(outputs, axis=-1, output_type=tf.int32)
+        return sample_ids
 
     # methods for build the network
     def build_single_cell(self, num_units, dropout):

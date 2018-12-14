@@ -1,5 +1,10 @@
 import collections
 
+from tensorflow.python.ops import math_ops
+from tensorflow.python.ops import control_flow_ops
+from tensorflow.python.framework import dtypes
+from tensorflow.contrib.seq2seq import SampleEmbeddingHelper
+
 '''
 Functions for train & translate
 '''
@@ -68,3 +73,34 @@ def isfloat(value):
     return True
   except ValueError:
     return False
+
+'''
+Helper classes
+'''
+
+class ModifiedSampleEmbeddingHelper(SampleEmbeddingHelper):
+    """
+    sample: same as SampleEmbeddingHelper
+    next_inputs: get from argmax (i.e. GreedyEmbeddingHelper)
+    """
+
+    def __init__(self, embedding, start_tokens, end_token, softmax_temperature=None, seed=None):
+        super(ModifiedSampleEmbeddingHelper, self).__init__(
+            embedding, start_tokens, end_token,
+            softmax_temperature, seed)
+
+    # modified!
+    def next_inputs(self, time, outputs, state, sample_ids, name=None):
+        """next_inputs_fn for ModifiedSampleEmbeddingHelper."""
+        del time, sample_ids  # unused by next_inputs_fn
+
+        argmax_ids = math_ops.argmax(outputs, axis=-1, output_type=dtypes.int32)
+
+        finished = math_ops.equal(argmax_ids, self._end_token)
+        all_finished = math_ops.reduce_all(finished)
+        next_inputs = control_flow_ops.cond(
+            all_finished,
+            # If we're finished, the next_inputs value doesn't matter
+            lambda: self._start_inputs,
+            lambda: self._embedding_fn(argmax_ids))
+        return (finished, next_inputs, state)
