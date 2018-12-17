@@ -1,3 +1,4 @@
+import sys
 import os
 import numpy as np
 import tensorflow as tf
@@ -48,7 +49,7 @@ def src_data(srcfile, src_word2id, max_sentence_length):
 
 def translate(config):
     # Running on a CPU should be fine
-    os.environ['CUDA_VISIBLE_DEVICES'] = ''
+    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
     sess_config = tf.ConfigProto()
 
     vocab_paths = {'vocab_src': config['vocab_src'], 'vocab_tgt': config['vocab_tgt']}
@@ -78,19 +79,28 @@ def translate(config):
 
         src_sent_ids, src_sent_len = src_data(config['srcfile'], src_word2id, config['max_sentence_length'])
 
-        translate_dict = {model.src_word_ids: src_sent_ids,
-                    model.src_sentence_lengths: src_sent_len,
-                    model.dropout: 0.0}
+        num_sentences = len(src_sent_ids)
+        batch_size = 1000
+        num_batches = int(num_sentences/batch_size) + 1
 
-        [translations] = sess.run([model.translations], feed_dict=translate_dict)
+        for i in range(num_batches):
 
-        for translation in translations:
-            words = []
-            for id in translation:
-                if id == params['eos_id']:
-                    break
-                words.append(tgt_id2word[id])
-            print(' '.join(words))
+            i_start = batch_size*i
+            i_end = i_start+batch_size if i_start+batch_size <= num_sentences else num_sentences
+            translate_dict = {model.src_word_ids: src_sent_ids[i_start:i_end],
+                        model.src_sentence_lengths: src_sent_len[i_start:i_end],
+                        model.dropout: 0.0}
+
+            [translations] = sess.run([model.translations], feed_dict=translate_dict)
+
+            for translation in translations:
+                words = []
+                for id in translation:
+                    if id == params['eos_id']:
+                        break
+                    words.append(tgt_id2word[id])
+                print(' '.join(words))
+                sys.stdout.flush()
 
         # print('translation done!')
 
