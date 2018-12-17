@@ -51,7 +51,7 @@ def levenshtein_align(a,b):
             bRev.append('*' * len(a[i]))
         elif costs[i][j] == 1 + costs[i][j-1]:
             j -= 1
-            aRev.append('*' * len(b[i]))
+            aRev.append('*' * len(b[j]))
             bRev.append(b[j])
 
     aout = aRev[::-1]
@@ -75,6 +75,8 @@ def align_corpus(cor1, cor2):
         lines2 = file.readlines()
 
     for sent1, sent2 in zip(lines1, lines2):
+        if len(sent1.split()) > 32:
+            continue
         align_sentence(sent1.strip(), sent2.strip())
         print()
 
@@ -85,10 +87,11 @@ def test():
 
 def main():
     if(len(sys.argv) != 3):
-        print('Usage: python3 bleu.py reference candidate')
+        print('Usage: python3 levenshtein-align.py original corrupted')
         return
-    reference = sys.argv[1]
-    candidate = sys.argv[2]
+    original = sys.argv[1]
+    corrupted = sys.argv[2]
+    align_corpus(original, corrupted)
 
 if __name__ == '__main__':
-    test()
+    main()
