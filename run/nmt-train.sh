@@ -20,15 +20,15 @@ $PYTHONBIN /home/alta/BLTSpeaking/ged-pm574/local/seq2seq/train.py \
     --train_tgt legacy/nmt-google/lib/data_ged/CLC.tgt \
     --vocab_src lib/wlists/vocab.clc.min-count2.en \
     --vocab_tgt lib/wlists/vocab.clc.min-count2.en \
-    --embedding_size 200 \
+    --embedding_size 300 \
     --num_layers 2 \
     --dropout 0.2 \
-    --num_units 128 \
+    --num_units 200 \
     --learning_rate 0.001 \
     --batch_size 256 \
-    --num_epochs 5 \
+    --num_epochs 10 \
     --random_seed 25 \
-    --decoding_method greedy \
-    --max_sentence_length 32 \
+    --decoding_method sample1 \
+    --max_sentence_length 50 \
     --use_gpu True \
-    --save lib/models/clc-exp2_1
+    --save lib/models/clc-arf-sample1_1
