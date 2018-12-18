@@ -68,31 +68,31 @@ Example (running on a CUED machine)
     
 2. Training an NMT system
 
-    2.1 Change in run/nmt-train.sh
+    2.1) Change in run/nmt-train.sh
     
         export PATH=<your-anaconda-bin-path>:$PATH
         export PYTHONBIN=<your-python-bin-path>
     
-    2.2 Set the configurations in run/the nmt-train.sh script
+    2.2) Set the configurations in run/the nmt-train.sh script
     
-    2.3 Run
+    2.3) Run
     
         locally:  ./run/nmt-train.sh
         on stack: ./run/run-nmt-train.sh log
     
 3. Translating using a trained system
 
-    3.1 Change  in run/nmt-translate.sh
+    3.1) Change  in run/nmt-translate.sh
     
         export PATH=<your-anaconda-bin-path>:$PATH
         export PYTHONBIN=<your-python-bin-path>
             
-    3.2 Set the configurations in run/the nmt-translate.sh script
+    3.2) Set the configurations in run/the nmt-translate.sh script
         - load - path to trained model
         - srcfile - source file to be translated (one sentence per line)
         - tgtfile - target file (output)
 
-    3.3 Run
+    3.3) Run
     
         locally:  ./run/nmt-translate.sh
         on stack: ./run/run-nmt-translate.sh log        
