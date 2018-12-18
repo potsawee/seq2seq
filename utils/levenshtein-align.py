@@ -68,6 +68,10 @@ def align_sentence(sent1, sent2):
         label = 'c' if a1 == b1 else 'i'
         print('{}\t{}\t{}'.format(a1,b1,label))
 
+def copy_original(sent):
+    for w in sent.split():
+        print('{}\t{}\tc'.format(w,w))
+
 def align_corpus(cor1, cor2):
     with open(cor1, 'r') as file:
         lines1 = file.readlines()
@@ -76,9 +80,11 @@ def align_corpus(cor1, cor2):
 
     for sent1, sent2 in zip(lines1, lines2):
         if len(sent1.split()) > 32:
-            continue
-        align_sentence(sent1.strip(), sent2.strip())
+            copy_original(sent1.strip())
+        else:
+            align_sentence(sent1.strip(), sent2.strip())
         print()
+
 
 def test():
     sent1 = 'the cat sat on the mat'
