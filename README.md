@@ -35,5 +35,6 @@ Training:
 Translating:
 
     python translate.py \
+        --load lib/models/tmp0 \
         --srcfile lib/srcfile.txt \ 
-        --load lib/models/tmp0
+        --tgtfile lib/tgtfile.txt \ 
