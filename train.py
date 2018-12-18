@@ -216,7 +216,7 @@ def train(config):
                 train_loss, _ = sess.run([model.train_loss, model.train_op],
                                     feed_dict=feed_dict)
 
-                if i % 10 == 0:
+                if i % 100 == 0:
                     infer_dict = { model.src_word_ids: batch['src_word_ids'],
                                 model.tgt_word_ids: batch['tgt_word_ids'],
                                 model.src_sentence_lengths: batch['src_sentence_lengths'],
@@ -229,7 +229,7 @@ def train(config):
                     print("batch: {} --- train_loss: {:.5f} | inf_loss: {:.5f}".format(i, train_loss, infer_loss))
                     sys.stdout.flush()
 
-                if i % 50 == 0:
+                if i % 500 == 0:
 
                     # my_sentences = ['They wrote almost a thousand pages on the topic . </s>',
                     #                 'And it takes weeks to perform our integrations . </s>',

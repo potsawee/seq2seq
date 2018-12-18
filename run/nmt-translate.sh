@@ -17,6 +17,6 @@ export PYTHONBIN=/home/miproj/urop.2018/pm574/anaconda3/envs/tf_gpu/bin/python
 
 $PYTHONBIN /home/alta/BLTSpeaking/ged-pm574/local/seq2seq/translate.py \
     --load lib/models/clc-arf-sample1 \
-    --srcfile /home/alta/BLTSpeaking/ged-pm574/artificial-error/lib/nmt-corrupt/mgb8.gec.orig.dot \
-    --tgtfile /home/alta/BLTSpeaking/ged-pm574/artificial-error/lib/nmt-corrupt/mgb8.gec.nmt.dot
+    --srcfile /home/alta/BLTSpeaking/ged-pm574/artificial-error/lib/nmt-corrupt/cts8.gec.orig.dot \
+    --tgtfile /home/alta/BLTSpeaking/ged-pm574/artificial-error/lib/nmt-corrupt/clc-arf-sample1/cts8.gec.nmt.dot
     # --model_number

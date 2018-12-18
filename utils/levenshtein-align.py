@@ -78,8 +78,9 @@ def align_corpus(cor1, cor2):
     with open(cor2, 'r') as file:
         lines2 = file.readlines()
 
+    max_sentence_length = 32
     for sent1, sent2 in zip(lines1, lines2):
-        if len(sent1.split()) > 32:
+        if len(sent1.split()) > max_sentence_length:
             copy_original(sent1.strip())
         else:
             align_sentence(sent1.strip(), sent2.strip())
