@@ -15,8 +15,9 @@ Translating source sentences to target sentences using a trained model
 def get_translate_arguments(parser):
     '''Arguments for translating'''
     # file paths
-    parser.add_argument('--srcfile', type=str, required=True)
     parser.add_argument('--load', type=str, required=True)  # path to load model
+    parser.add_argument('--srcfile', type=str, required=True)
+    parser.add_argument('--tgtfile', type=str, required=True)
     parser.add_argument('--model_number', type=int, default=None)
 
     return parser
@@ -48,8 +49,16 @@ def src_data(srcfile, src_word2id, max_sentence_length):
     return src_sent_ids, src_sent_len
 
 def translate(config):
-    # Running on a CPU should be fine
-    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+    if 'X_SGE_CUDA_DEVICE' in os.environ:
+        print('running on the stack...')
+        cuda_device = os.environ['X_SGE_CUDA_DEVICE']
+        print('X_SGE_CUDA_DEVICE is set to {}'.format(cuda_device))
+        os.environ['CUDA_VISIBLE_DEVICES'] = cuda_device
+
+    else: # development only e.g. air202
+        print('running locally...')
+        os.environ['CUDA_VISIBLE_DEVICES'] = '1' # choose the device (GPU) here
+
     sess_config = tf.ConfigProto()
 
     vocab_paths = {'vocab_src': config['vocab_src'], 'vocab_tgt': config['vocab_tgt']}
@@ -83,6 +92,9 @@ def translate(config):
         batch_size = 1000
         num_batches = int(num_sentences/batch_size) + 1
 
+        tgt_lines = []
+        print('num_batches =', num_batches)
+
         for i in range(num_batches):
 
             i_start = batch_size*i
@@ -99,10 +111,17 @@ def translate(config):
                     if id == params['eos_id']:
                         break
                     words.append(tgt_id2word[id])
-                print(' '.join(words))
-                sys.stdout.flush()
 
-        # print('translation done!')
+                # print(' '.join(words))
+                tgt_lines.append(' '.join(words))
+
+            print('#', end='')
+            sys.stdout.flush()
+
+        with open(config['tgtfile'], 'w') as file:
+            for line in tgt_lines:
+                file.write(line + '\n')
+        print('translation done!')
 
 def main():
     # get configurations from the terminal
@@ -114,6 +133,7 @@ def main():
     config = read_config(config_path)
     config['load'] = args['load']
     config['srcfile'] = args['srcfile']
+    config['tgtfile'] = args['tgtfile']
     config['model_number'] = args['model_number']
 
     translate(config=config)
