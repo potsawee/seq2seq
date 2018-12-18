@@ -89,9 +89,9 @@ Example (running on a CUED machine)
             
     3.2) Set the configurations in the **run/nmt-translate.sh** script
     
-        - load - path to trained model
-        - srcfile - source file to be translated (one sentence per line)
-        - tgtfile - target file (output)
+    - load - path to trained model
+    - srcfile - source file to be translated (one sentence per line)
+    - tgtfile - target file (output)
 
     3.3) Run
     
