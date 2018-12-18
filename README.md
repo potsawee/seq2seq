@@ -88,6 +88,7 @@ Example (running on a CUED machine)
         export PYTHONBIN=<your-python-bin-path>
             
     3.2) Set the configurations in the **run/nmt-translate.sh** script
+    
         - load - path to trained model
         - srcfile - source file to be translated (one sentence per line)
         - tgtfile - target file (output)
