@@ -38,3 +38,4 @@ Translating:
         --load lib/models/tmp0 \
         --srcfile lib/srcfile.txt \ 
         --tgtfile lib/tgtfile.txt \ 
+        --model_number 19
