@@ -156,7 +156,7 @@ class EncoderDecoder(object):
 
         self.train_decoder = tf.contrib.seq2seq.BasicDecoder(
                     cell=self.decoder_cell, helper=self.train_helper,
-                    initial_state=self.decoder_cell.zero_state(s[0],dtype=tf.float32),
+                    initial_state=self.decoder_cell.zero_state(s[0],dtype=tf.float32).clone(cell_state=self.encoder_state),
                     output_layer=self.projection_layer)
 
         # Dynamic decoding
@@ -192,7 +192,7 @@ class EncoderDecoder(object):
             self.infer_decoder = tf.contrib.seq2seq.BasicDecoder(
                 cell=self.decoder_cell,
                 helper=self.infer_helper,
-                initial_state=self.decoder_cell.zero_state(s[0],dtype=tf.float32),
+                initial_state=self.decoder_cell.zero_state(s[0],dtype=tf.float32).clone(cell_state=self.encoder_state),
                 output_layer=self.projection_layer)
 
         # elif self.decoding_method == 'beam':
