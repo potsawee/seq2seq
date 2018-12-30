@@ -34,6 +34,7 @@ def add_arguments(parser):
     parser.add_argument('--learning_rate', type=float, default=0.01)
     parser.add_argument('--dropout', type=float, default=0.0)
     parser.add_argument('--batch_size', type=int, default=256)
+    parser.add_argument('--beam_width', type=int, default=10) # only use if decoding_method == beamsearch
 
     # training settings
     parser.add_argument('--num_epochs', type=int, default=20)
@@ -213,20 +214,22 @@ def train(config):
                             model.tgt_sentence_lengths: batch['tgt_sentence_lengths'],
                             model.dropout: config['dropout']}
 
-                train_loss, _ = sess.run([model.train_loss, model.train_op],
-                                    feed_dict=feed_dict)
+                _ = sess.run([model.train_op], feed_dict=feed_dict)
 
                 if i % 100 == 0:
-                    infer_dict = { model.src_word_ids: batch['src_word_ids'],
-                                model.tgt_word_ids: batch['tgt_word_ids'],
-                                model.src_sentence_lengths: batch['src_sentence_lengths'],
-                                model.tgt_sentence_lengths: batch['tgt_sentence_lengths'],
-                                model.dropout: 0.0}
+                    # to print out training status
 
-                    [my_translations, infer_loss] = sess.run([model.translations, model.infer_loss],
-                                                        feed_dict=infer_dict)
+                    if config['decoding_method'] != 'beamsearch':
+                        [train_loss, infer_loss] = sess.run([model.train_loss, model.infer_loss], feed_dict=feed_dict)
+                        print("batch: {} --- train_loss: {:.5f} | inf_loss: {:.5f}".format(i, train_loss, infer_loss))
 
-                    print("batch: {} --- train_loss: {:.5f} | inf_loss: {:.5f}".format(i, train_loss, infer_loss))
+                    else:
+                        # --- beam search --- #
+                        [train_loss] = sess.run([model.train_loss], feed_dict=feed_dict)
+                        print("BEAMSEARCH - batch: {} --- train_loss: {:.5f}".format(i, train_loss))
+
+                    [translations] = sess.run([model.translations], feed_dict=feed_dict)
+                    # pdb.set_trace()
                     sys.stdout.flush()
 
                 if i % 500 == 0:

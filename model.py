@@ -17,6 +17,7 @@ class EncoderDecoder(object):
         self.num_units = config['num_units']
         self.decoding_method = config['decoding_method']
         self.max_sentence_length = config['max_sentence_length']
+        self.beam_width = config['beam_width']
         self.params = params
 
 
@@ -125,25 +126,26 @@ class EncoderDecoder(object):
             cell_list.append(single_cell)
 
         if self.num_layers == 1:
-            self.decoder_cell = cell_list[0]
+            self.stacked_decoder_cell = cell_list[0]
         elif self.num_layers > 1:
-            self.decoder_cell = tf.nn.rnn_cell.MultiRNNCell(cell_list)
+            self.stacked_decoder_cell = tf.nn.rnn_cell.MultiRNNCell(cell_list)
         else:
             raise ValueError('num_layers error')
 
-        # --------------- Attention Mechanism --------------- #
+        # ------------------------- Training --------------------------- #
+
+        # --------------- Attention Mechanism (training) --------------- #
         # note that previously encoder_outputs is the set of all source 'hidden' states at the top layer
-        self.attention_mechanism = tf.contrib.seq2seq.LuongAttention(
-            num_units=self.num_units,
-            memory=self.encoder_outputs,
-            memory_sequence_length=self.src_sentence_lengths)
+        with tf.variable_scope('shared_attention_mechanism'):
+            self.attention_mechanism = tf.contrib.seq2seq.LuongAttention(
+                num_units=self.num_units,
+                memory=self.encoder_outputs,
+                memory_sequence_length=self.src_sentence_lengths)
 
         self.decoder_cell = tf.contrib.seq2seq.AttentionWrapper(
-            cell=self.decoder_cell,
+            cell=self.stacked_decoder_cell,
             attention_mechanism=self.attention_mechanism,
             attention_layer_size=self.num_units)
-
-        # -------------------- Training -------------------- #
 
         # Helper - A helper for use during training. Only reads inputs.
         #          Returned sample_ids are the argmax of the RNN output logits.
@@ -161,13 +163,14 @@ class EncoderDecoder(object):
 
         # Dynamic decoding
         # (final_outputs, final_state, final_sequence_lengths)
-        (self.outputs, _ , _ ) = tf.contrib.seq2seq.dynamic_decode(
-                    self.train_decoder, output_time_major=False, impute_finished=True)
+        with tf.variable_scope('decode_with_shared_attention'):
+            (self.outputs, _ , _ ) = tf.contrib.seq2seq.dynamic_decode(
+                        self.train_decoder, output_time_major=False, impute_finished=True)
         self.logits = self.outputs.rnn_output
 
         # -------------------- Inference -------------------- #
         # Inference Helper (1) greedy search (2) sample (3) modified-sample (4) beam search
-        if self.decoding_method in ['greedy', 'sample1', 'sample2']:
+        if self.decoding_method != 'beamsearch':
             if self.decoding_method == 'greedy':
                 self.infer_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
                     embedding=self.embedding_decoder,
@@ -195,41 +198,61 @@ class EncoderDecoder(object):
                 initial_state=self.decoder_cell.zero_state(s[0],dtype=tf.float32).clone(cell_state=self.encoder_state),
                 output_layer=self.projection_layer)
 
-        # elif self.decoding_method == 'beam':
-            # beam_width = 10
-            # # Replicate encoder infos beam_width times
-            # decoder_initial_state = tf.contrib.seq2seq.tile_batch(
-            #     self.decoder_cell.zero_state(s[0],dtype=tf.float32),
-            #     multiplier=beam_width) # set beam width = 10
-            #
-            # # Define a beam-search decoder
-            # self.infer_decoder = tf.contrib.seq2seq.BeamSearchDecoder(
-            #     cell=self.decoder_cell,
-            #     embedding=self.embedding_decoder,
-            #     start_tokens=tf.fill([s[0]], self.params['go_id']),
-            #     end_token=self.params['eos_id'],
-            #     initial_state=decoder_initial_state,
-            #     beam_width=beam_width,
-            #     output_layer=self.projection_layer,
-            #     length_penalty_weight=0.0)
+        elif self.decoding_method == 'beamsearch':
+
+            self.encoder_outputs = tf.contrib.seq2seq.tile_batch(self.encoder_outputs, multiplier=self.beam_width)
+            self.src_sentence_lengths_beam = tf.contrib.seq2seq.tile_batch(self.src_sentence_lengths, multiplier=self.beam_width)
+            self.encoder_state = tf.contrib.seq2seq.tile_batch(self.encoder_state, multiplier=self.beam_width)
+
+            decoder_initial_state=self.decoder_cell.zero_state(s[0]*self.beam_width, dtype=tf.float32).clone(cell_state=self.encoder_state)
+
+            with tf.variable_scope('shared_attention_mechanism', reuse=True):
+                self.attention_mechanism = tf.contrib.seq2seq.LuongAttention(
+                    num_units=self.num_units,
+                    memory=self.encoder_outputs,
+                    memory_sequence_length=self.src_sentence_lengths_beam)
+
+            self.decoder_cell = tf.contrib.seq2seq.AttentionWrapper(
+                cell=self.stacked_decoder_cell,
+                attention_mechanism=self.attention_mechanism,
+                attention_layer_size=self.num_units)
+
+            self.infer_decoder = tf.contrib.seq2seq.BeamSearchDecoder(
+                cell=self.decoder_cell,
+                embedding=self.embedding_decoder,
+                start_tokens=tf.fill([s[0]], self.params['go_id']),
+                end_token=self.params['eos_id'],
+                initial_state=decoder_initial_state,
+                beam_width=self.beam_width,
+                output_layer=self.projection_layer,
+                length_penalty_weight=0.0)
 
         else:
             raise ValueError('decoding method error: only GreedySearch or BeamSearch')
 
 
         # Dynamic decoding
-        (self.infer_outputs, _ , _ ) = tf.contrib.seq2seq.dynamic_decode(
-                self.infer_decoder,
-                maximum_iterations=self.max_sentence_length,
-                output_time_major=False, impute_finished=True)
+        if self.decoding_method != 'beamsearch':
+            with tf.variable_scope('decode_with_shared_attention', reuse=True):
+                (self.infer_outputs, _ , _ ) = tf.contrib.seq2seq.dynamic_decode(
+                        self.infer_decoder,
+                        maximum_iterations=self.max_sentence_length,
+                        output_time_major=False, impute_finished=True)
 
-        self.translations = self.infer_outputs.sample_id
+            self.translations = self.infer_outputs.sample_id # shape = [batch_size, max_sentence_length]
 
-        # 0 time
-        # 1 batch_size
-        # 2 beam_width
-        # if self.decoding_method == 'beam':
-        #     self.translations
+
+        elif self.decoding_method == 'beamsearch':
+            with tf.variable_scope('decode_with_shared_attention', reuse=True):
+                (self.infer_outputs, _ , _ ) = tf.contrib.seq2seq.dynamic_decode(
+                        self.infer_decoder,
+                        maximum_iterations=self.max_sentence_length,
+                        output_time_major=False, impute_finished=False)
+
+            # outputs: predicted_ids, beam_search_decoder_output
+            self.predicted_ids = self.infer_outputs.predicted_ids # shape = [batch_size, max_sentence_length, beam_width]
+            self.translations = self.predicted_ids[:,:,0] # the first one has the highest probability
+
 
         ############################## Calculating Loss ##############################
         # -------------------- Training -------------------- #
@@ -245,18 +268,19 @@ class EncoderDecoder(object):
         self.train_loss = (tf.reduce_sum(self.crossent * self.target_weights) / self.batch_size)
 
         # -------------------- Inference -------------------- #
-        self.infer_logits = self.infer_outputs.rnn_output
-        infer_paddings = [[0, 0], [0, self.max_sentence_length-tf.shape(self.infer_logits)[1]], [0, 0]]
-        self.infer_logits = tf.pad(self.infer_logits, infer_paddings, 'CONSTANT', constant_values=-1)
+        if self.decoding_method != 'beamsearch':
+            self.infer_logits = self.infer_outputs.rnn_output
+            infer_paddings = [[0, 0], [0, self.max_sentence_length-tf.shape(self.infer_logits)[1]], [0, 0]]
+            self.infer_logits = tf.pad(self.infer_logits, infer_paddings, 'CONSTANT', constant_values=-1)
 
-        self.infer_crossent = tf.nn.sparse_softmax_cross_entropy_with_logits(
-                        labels=self.tgt_word_ids, logits=self.infer_logits)
+            self.infer_crossent = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                            labels=self.tgt_word_ids, logits=self.infer_logits)
 
-        self.infer_target_weights = tf.sequence_mask(lengths=self.tgt_sentence_lengths,
-                                            maxlen=self.max_sentence_length,
-                                            dtype=tf.float32)
+            self.infer_target_weights = tf.sequence_mask(lengths=self.tgt_sentence_lengths,
+                                                maxlen=self.max_sentence_length,
+                                                dtype=tf.float32)
 
-        self.infer_loss = (tf.reduce_sum(self.infer_crossent * self.infer_target_weights) / self.batch_size)
+            self.infer_loss = (tf.reduce_sum(self.infer_crossent * self.infer_target_weights) / self.batch_size)
 
         ############################## Gradient and Optimisation ##############################
         # backpropagation
