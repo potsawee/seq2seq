@@ -1,4 +1,5 @@
 import collections
+import math
 import tensorflow as tf
 from helper import ModifiedSampleEmbeddingHelper
 import pdb
@@ -18,6 +19,9 @@ class EncoderDecoder(object):
         self.decoding_method = config['decoding_method']
         self.max_sentence_length = config['max_sentence_length']
         self.beam_width = config['beam_width']
+        self._scheduled_sampling = config['scheduled_sampling']
+        self._counter = 0 # for counting the number of iterations
+        self._train_epochs = config['num_epochs']
         self.params = params
 
 
@@ -134,7 +138,6 @@ class EncoderDecoder(object):
 
         # ------------------------- Training --------------------------- #
 
-        # --------------- Attention Mechanism (training) --------------- #
         # note that previously encoder_outputs is the set of all source 'hidden' states at the top layer
         with tf.variable_scope('shared_attention_mechanism'):
             self.attention_mechanism = tf.contrib.seq2seq.LuongAttention(
@@ -149,10 +152,23 @@ class EncoderDecoder(object):
 
         # Helper - A helper for use during training. Only reads inputs.
         #          Returned sample_ids are the argmax of the RNN output logits.
-        self.train_helper = tf.contrib.seq2seq.TrainingHelper(
-                    inputs=self.tgt_embedded,
-                    sequence_length=[self.max_sentence_length]*self.batch_size,
-                    time_major=False)
+
+        if not self._scheduled_sampling:
+            # scheduled_sampling for training is disabled
+            self.train_helper = tf.contrib.seq2seq.TrainingHelper(
+                        inputs=self.tgt_embedded,
+                        sequence_length=[self.max_sentence_length]*self.batch_size,
+                        time_major=False)
+
+        else:
+            # scheduled_sampling for training is enabled
+            # sampling_probability (if 0.0 means no sampling, 1.0 means always sampling)
+            self.train_helper = tf.contrib.seq2seq.ScheduledEmbeddingTrainingHelper(
+                        inputs=self.tgt_embedded,
+                        sequence_length=[self.max_sentence_length]*self.batch_size,
+                        embedding=self.embedding_decoder,
+                        sampling_probability=1.0*self._counter/self._train_epochs, # linear increase
+                        time_major=False)
 
         self.projection_layer = tf.layers.Dense(self.params['vocab_tgt_size'], use_bias=True)
 
@@ -160,6 +176,7 @@ class EncoderDecoder(object):
                     cell=self.decoder_cell, helper=self.train_helper,
                     initial_state=self.decoder_cell.zero_state(s[0],dtype=tf.float32).clone(cell_state=self.encoder_state),
                     output_layer=self.projection_layer)
+
 
         # Dynamic decoding
         # (final_outputs, final_state, final_sequence_lengths)
@@ -169,6 +186,7 @@ class EncoderDecoder(object):
         self.logits = self.outputs.rnn_output
 
         # -------------------- Inference -------------------- #
+
         # Inference Helper (1) greedy search (2) sample (3) modified-sample (4) beam search
         if self.decoding_method != 'beamsearch':
             if self.decoding_method == 'greedy':
@@ -306,3 +324,7 @@ class EncoderDecoder(object):
         single_cell = tf.nn.rnn_cell.LSTMCell(num_units, state_is_tuple=True)
         single_cell = tf.nn.rnn_cell.DropoutWrapper(cell=single_cell, input_keep_prob=1.0-dropout)
         return single_cell
+
+    def increment_counter(self):
+        '''increment counter by 1'''
+        self._counter += 1

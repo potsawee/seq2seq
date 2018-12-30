@@ -16,19 +16,21 @@ source activate tf_gpu
 export PYTHONBIN=/home/miproj/urop.2018/pm574/anaconda3/envs/tf_gpu/bin/python
 
 $PYTHONBIN /home/alta/BLTSpeaking/ged-pm574/local/seq2seq/train.py \
-    --train_src legacy/nmt-google/lib/data_ged/CLC.src \
-    --train_tgt legacy/nmt-google/lib/data_ged/CLC.tgt \
+    --train_src legacy/nmt-google/lib/data_ged/CLC.tgt \
+    --train_tgt legacy/nmt-google/lib/data_ged/CLC.src \
     --vocab_src lib/wlists/vocab.clc.min-count2.en \
     --vocab_tgt lib/wlists/vocab.clc.min-count2.en \
-    --embedding_size 300 \
+    --embedding_size 200 \
     --num_layers 2 \
     --dropout 0.2 \
-    --num_units 200 \
+    --num_units 128 \
     --learning_rate 0.001 \
-    --batch_size 256 \
+    --batch_size 64 \
     --num_epochs 10 \
     --random_seed 25 \
-    --decoding_method sample1 \
+    --decoding_method beamsearch \
+    --beam_width 10 \
     --max_sentence_length 50 \
+    --scheduled_sampling False \
     --use_gpu True \
-    --save lib/models/clc-arf-sample1_1
+    --save lib/models/tmp0

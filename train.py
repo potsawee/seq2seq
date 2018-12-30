@@ -40,6 +40,7 @@ def add_arguments(parser):
     parser.add_argument('--num_epochs', type=int, default=20)
     parser.add_argument('--random_seed', type=int, default=25)
     parser.add_argument('--decoding_method', type=str, default='greedy')
+    parser.add_argument('--scheduled_sampling', type="bool", nargs="?", const=True, default=False)
 
 
     # data
@@ -269,6 +270,7 @@ def train(config):
                         my_words = [tgt_id2word[id] for id in my_sent]
                         print(' '.join(my_words))
 
+            model.increment_counter()
 
             print("################## EPOCH {} done ##################".format(epoch))
             saver.save(sess, save_path + '/model', global_step=epoch)
