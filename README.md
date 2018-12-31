@@ -23,8 +23,10 @@ Encoder&Decoder for GED/GEC experiments
         --batch_size 256 \
         --num_epochs 100 \
         --random_seed 25 \
-        --decoding_method greedy \
+        --decoding_method beamsearch \
+        --beam_width 10 \
         --max_sentence_length 32 \
+        --scheduled_sampling True \
         --use_gpu True \
         --save lib/models/tmp0
 
