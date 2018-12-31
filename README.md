@@ -50,8 +50,10 @@ Change these configurations in the run/nmt-train.sh before training, and it will
 - **learning_rate** - learning rate (default 0.01)
 - **batch_size** - batch size (default 256)
 - **random_seed** - random seed (default 25)
-- **decoding_method** - greedy/sample1/sample2
+- **decoding_method** - greedy/sample1/sample2/beamsearch
+- **beam_width** - beam width (default 10) only used if decoding_method == beamsearch
 - **max_sentence_length** - sentences longer than this will be neglected (default 32)
+- **scheduled_sampling** - True/False whether to enable Scheduled Sampling for training
 - **use_gpu** - enable GPU (default True)
 - **save** - path to the location to store the trained model & the configurations
         
