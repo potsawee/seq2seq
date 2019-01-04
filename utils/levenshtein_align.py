@@ -78,7 +78,7 @@ def align_corpus(cor1, cor2):
     with open(cor2, 'r') as file:
         lines2 = file.readlines()
 
-    max_sentence_length = 32
+    max_sentence_length = 50
     for sent1, sent2 in zip(lines1, lines2):
         if len(sent1.split()) > max_sentence_length:
             copy_original(sent1.strip())
@@ -94,7 +94,7 @@ def test():
 
 def main():
     if(len(sys.argv) != 3):
-        print('Usage: python3 levenshtein-align.py original corrupted')
+        print('Usage: python3 levenshtein_align.py original corrupted')
         return
     original = sys.argv[1]
     corrupted = sys.argv[2]
