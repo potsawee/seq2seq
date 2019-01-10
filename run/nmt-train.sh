@@ -21,15 +21,17 @@ $PYTHONBIN /home/alta/BLTSpeaking/ged-pm574/local/seq2seq/train.py \
     --vocab_src lib/wlists/vocab.clc.min-count2.en \
     --vocab_tgt lib/wlists/vocab.clc.min-count2.en \
     --embedding_size 200 \
+    --load_embedding_src lib/embeddings/glove.6B.200d.txt \
+    --load_embedding_tgt lib/embeddings/glove.6B.200d.txt \
     --num_layers 2 \
-    --dropout 0.2 \
+    --dropout 0.0 \
     --num_units 128 \
     --learning_rate 0.001 \
-    --batch_size 64 \
+    --batch_size 256 \
     --num_epochs 10 \
     --random_seed 25 \
-    --decoding_method beamsearch \
-    --beam_width 10 \
+    --decoding_method greedy \
+    --beam_width 1 \
     --max_sentence_length 50 \
     --scheduled_sampling False \
     --use_gpu True \

@@ -7,7 +7,7 @@ import argparse
 import pdb
 
 from model import EncoderDecoder
-from helper import load_vocab, load_data, write_config
+from helper import load_vocab, load_data, write_config, load_pretrained_embedding
 
 '''
 Training the Encoder Decoder model
@@ -41,6 +41,8 @@ def add_arguments(parser):
     parser.add_argument('--random_seed', type=int, default=25)
     parser.add_argument('--decoding_method', type=str, default='greedy')
     parser.add_argument('--scheduled_sampling', type="bool", nargs="?", const=True, default=False)
+    parser.add_argument('--load_embedding_src', type=str, default=None)
+    parser.add_argument('--load_embedding_tgt', type=str, default=None)
 
 
     # data
@@ -191,6 +193,19 @@ def train(config):
 
         if saved_model == None:
             sess.run(tf.global_variables_initializer())
+            # ------------ load pre-trained embeddings ------------ #
+            if config['load_embedding_src'] != None:
+                src_embedding = sess.run(model.src_word_embeddings)
+                src_embedding_matrix = load_pretrained_embedding(src_word2id, src_embedding, config['load_embedding_src'])
+                sess.run(model.src_word_embeddings.assign(src_embedding_matrix))
+            if config['load_embedding_tgt'] != None:
+                if config['load_embedding_tgt'] == config['load_embedding_src']:
+                    sess.run(model.tgt_word_embeddings.assign(src_embedding_matrix))
+                else:
+                    tgt_embedding = sess.run(model.tgt_word_embeddings)
+                    tgt_embedding_matrix = load_pretrained_embedding(tgt_word2id, tgt_embedding, config['load_embedding_tgt'])
+                    sess.run(model.tgt_word_embeddings.assign(tgt_embedding_matrix))
+            # ----------------------------------------------------- #
         else:
             new_saver = tf.train.import_meta_graph(saved_model + '.meta')
             new_saver.restore(sess, saved_model)
@@ -239,10 +254,10 @@ def train(config):
                     #                 'And it takes weeks to perform our integrations . </s>',
                     #                 'It was terribly dangerous . </s>',
                     #                 'This is a fourth alternative that you are soon going to have . </s>']
-                    my_sentences = ['this is a test . </s>',
-                                    'this is to confirm my reservation at your hotel . </s>',
-                                    'playing tennis is good for you . </s>',
-                                    'when talking about successful longterm business relationships customer services are an important element </s>'
+                    my_sentences = ['this is test . </s>',
+                                    'this is confirm my reservation at hotel . </s>',
+                                    'playing tennis good for you . </s>',
+                                    'when talking about successful longterm business relationships customer services are important element </s>'
                     ]
 
                     my_sent_ids = []

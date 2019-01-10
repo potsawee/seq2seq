@@ -1,4 +1,5 @@
 import collections
+import numpy as np
 
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import control_flow_ops
@@ -10,9 +11,9 @@ Functions for train & translate
 '''
 
 def load_vocab(paths):
-    with open(paths['vocab_src']) as file:
+    with open(paths['vocab_src'], encoding="utf8") as file:
         vocab_src = file.readlines()
-    with open(paths['vocab_tgt']) as file:
+    with open(paths['vocab_tgt'], encoding="utf8") as file:
         vocab_tgt = file.readlines()
 
     src_word2id = collections.OrderedDict()
@@ -33,9 +34,9 @@ def load_vocab(paths):
     return src_word2id, tgt_word2id
 
 def load_data(paths):
-    with open(paths['train_src']) as file:
+    with open(paths['train_src'], encoding="utf8") as file:
         train_src_sentences = file.readlines()
-    with open(paths['train_tgt']) as file:
+    with open(paths['train_tgt'], encoding="utf8") as file:
         train_tgt_sentences = file.readlines()
 
     assert (len(train_src_sentences) == len(train_tgt_sentences)), "train_source != train_target"
@@ -73,6 +74,26 @@ def isfloat(value):
     return True
   except ValueError:
     return False
+
+def load_pretrained_embedding(word2id, embedding_matrix, embedding_path):
+    # assign value to src_word_embeddings and tgt_word_embeddings
+    counter = 0
+    with open(embedding_path, 'r') as file:
+        for line in file:
+            items = line.strip().split()
+            if len(items) <= 2:
+                continue
+            word = items[0].lower()
+            if word in word2id:
+                id = word2id[word]
+                vector = np.array(items[1:])
+                embedding_matrix[id] = vector
+                counter += 1
+    print('loaded pre-trained embedding:', embedding_path)
+    print('embedding vectors found:', counter)
+
+    return embedding_matrix
+
 
 '''
 Helper classes
