@@ -16,6 +16,8 @@ Encoder&Decoder for GED/GEC experiments
         --vocab_src lib/wlists/source.txt \
         --vocab_tgt lib/wlists/target.txt \
         --embedding_size 200 \
+        --load_embedding_src lib/embeddings/glove.6B.200d.txt \
+        --load_embedding_tgt lib/embeddings/glove.6B.200d.txt \
         --num_layers 2 \
         --dropout 0.2 \
         --num_units 128 \
@@ -46,6 +48,8 @@ Change these configurations in the run/nmt-train.sh before training, and it will
 - **vocab_src** - path to source vocabulary (one line per word including <go>, <unk>, and </s>)
 - **vocab_src** - path to target vocabulary (one line per word including <go>, <unk>, and </s>)
 - **embedding_size** - embedding layer size (default 200)
+- **load_embedding_src** - path to pre-trained embedding for the encoder (default None)
+- **load_embedding_tgt** - path to pre-trained embedding for the decoder (default None)
 - **num_layers** - the number of LSTM layers (must be even as the encoder is bi-directional, default 2)
 - **dropout** - the dropout probability of the LSTM layers (default 0.0)
 - **num_units** - the number of the hidden units (default 128)
