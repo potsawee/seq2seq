@@ -314,10 +314,29 @@ class EncoderDecoder(object):
         clipped_gradients, _ = tf.clip_by_global_norm(gradients, max_gradient_norm)
 
         # optimisation
-        optimizer = tf.train.AdamOptimizer(self.learning_rate)
-        self.train_op = optimizer.apply_gradients(zip(clipped_gradients, trainable_params))
+        self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
+        self.train_op = self.optimizer.apply_gradients(zip(clipped_gradients, trainable_params))
 
     # end build_network()
+
+    def adapt_weights(self, param_names):
+        '''
+        Args:
+            - param_names: a list of names (strings) of the weights/biases to be adapted
+        '''
+
+        # Create variable scope for the trainable parts of the graph: tf.variable_scope('train').
+        # get trainable variables
+        all_trainable_vars = tf.trainable_variables()
+        adapt_vars = []
+        for var in all_trainable_vars:
+            if var.name in param_names:
+                adapt_vars.append(var)
+        # train only the variables of a particular scope
+        gradients = tf.gradients(self.train_loss, adapt_vars)
+        max_gradient_norm = 1.0 # set to value like 1.0, 5.0
+        clipped_gradients, _ = tf.clip_by_global_norm(gradients, max_gradient_norm)
+        self.adapt_op = self.optimizer.apply_gradients(zip(clipped_gradients, adapt_vars))
 
     # callable for infer_helper
     def embedding_decoder(self, ids):
