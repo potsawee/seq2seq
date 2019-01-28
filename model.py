@@ -11,7 +11,6 @@ Encoder-Decoder architecture
 class EncoderDecoder(object):
     def __init__(self, config, params):
         # hyper-parameters / configurations
-        self.learning_rate = config['learning_rate']
         self.batch_size = config['batch_size']
         self.embedding_size = config['embedding_size']
         self.num_layers = config['num_layers']
@@ -39,6 +38,7 @@ class EncoderDecoder(object):
         self.tgt_sentence_lengths = tf.placeholder(tf.int32, [None], name="tgt_sentence_lengths")
 
         self.dropout = tf.placeholder(tf.float32, name="dropout")
+        self.learning_rate = tf.placeholder(tf.float32, name="learning_rate")
 
         ############################## padding <go> ##############################
         go_id = self.params['go_id']

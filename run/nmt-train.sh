@@ -21,10 +21,11 @@ $PYTHONBIN /home/alta/BLTSpeaking/ged-pm574/local/seq2seq/train.py \
     --vocab_src lib/wlists/vocab.clc.min-count2.en \
     --vocab_tgt lib/wlists/vocab.clc.min-count2.en \
     --embedding_size 200 \
-    --num_layers 8 \
+    --num_layers 4 \
     --dropout 0.2 \
     --num_units 200 \
     --learning_rate 0.001 \
+    --decay_rate 0.8 \
     --batch_size 256 \
     --num_epochs 10 \
     --random_seed 25 \
@@ -34,6 +35,6 @@ $PYTHONBIN /home/alta/BLTSpeaking/ged-pm574/local/seq2seq/train.py \
     --scheduled_sampling True \
     --residual True \
     --use_gpu True \
-    --save lib/models/residual/deep8 \
+    --save lib/models/tmp0 \
     --load_embedding_src lib/embeddings/glove.6B.200d.txt \
     --load_embedding_tgt lib/embeddings/glove.6B.200d.txt \

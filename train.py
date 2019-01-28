@@ -32,6 +32,7 @@ def add_arguments(parser):
 
     # hyperpaprameters
     parser.add_argument('--learning_rate', type=float, default=0.01)
+    parser.add_argument('--decay_rate', type=float, default=0.999)
     parser.add_argument('--dropout', type=float, default=0.0)
     parser.add_argument('--batch_size', type=int, default=256)
     parser.add_argument('--beam_width', type=int, default=10) # only use if decoding_method == beamsearch
@@ -166,6 +167,9 @@ def train(config):
     model = EncoderDecoder(config, params)
     model.build_network()
 
+    learning_rate = config['learning_rate']
+    decay_rate = config['decay_rate']
+
     tf_variables = tf.trainable_variables()
     for i in range(len(tf_variables)):
         print(tf_variables[i])
@@ -182,7 +186,7 @@ def train(config):
 
         else: # development only e.g. air202
             print('running locally...')
-            os.environ['CUDA_VISIBLE_DEVICES'] = '3' # choose the device (GPU) here
+            os.environ['CUDA_VISIBLE_DEVICES'] = '1' # choose the device (GPU) here
 
         sess_config = tf.ConfigProto(allow_soft_placement=True)
         sess_config.gpu_options.allow_growth = True # Whether the GPU memory usage can grow dynamically.
@@ -236,7 +240,8 @@ def train(config):
                             model.tgt_word_ids: batch['tgt_word_ids'],
                             model.src_sentence_lengths: batch['src_sentence_lengths'],
                             model.tgt_sentence_lengths: batch['tgt_sentence_lengths'],
-                            model.dropout: config['dropout']}
+                            model.dropout: config['dropout'],
+                            model.learning_rate: learning_rate}
 
                 _ = sess.run([model.train_op], feed_dict=feed_dict)
 
@@ -285,7 +290,8 @@ def train(config):
 
                     infer_dict = {model.src_word_ids: my_sent_ids,
                                 model.src_sentence_lengths: my_sent_len,
-                                model.dropout: 0.0}
+                                model.dropout: 0.0,
+                                model.learning_rate: learning_rate}
 
                     [my_translations] = sess.run([model.translations], feed_dict=infer_dict)
                     # pdb.set_trace()
@@ -294,6 +300,7 @@ def train(config):
                         print(' '.join(my_words))
 
             model.increment_counter()
+            learning_rate *= decay_rate
 
             print("################## EPOCH {} done ##################".format(epoch))
             saver.save(sess, save_path + '/model', global_step=epoch)
