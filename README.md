@@ -22,6 +22,7 @@ Encoder&Decoder for GED/GEC experiments
         --dropout 0.2 \
         --num_units 128 \
         --learning_rate 0.001 \
+        --decay_rate 0.8 \
         --batch_size 256 \
         --num_epochs 100 \
         --random_seed 25 \
@@ -29,6 +30,7 @@ Encoder&Decoder for GED/GEC experiments
         --beam_width 10 \
         --max_sentence_length 32 \
         --scheduled_sampling True \
+        --residual True \
         --use_gpu True \
         --save lib/models/tmp0
 
@@ -54,12 +56,14 @@ Change these configurations in the run/nmt-train.sh before training, and it will
 - **dropout** - the dropout probability of the LSTM layers (default 0.0)
 - **num_units** - the number of the hidden units (default 128)
 - **learning_rate** - learning rate (default 0.01)
+- **decay_rate** - learning rate is multipled by this factor after each epoch (default 0.999)
 - **batch_size** - batch size (default 256)
 - **random_seed** - random seed (default 25)
 - **decoding_method** - greedy/sample1/sample2/beamsearch
 - **beam_width** - beam width (default 10) only used if decoding_method == beamsearch
 - **max_sentence_length** - sentences longer than this will be neglected (default 32)
 - **scheduled_sampling** - True/False whether to enable Scheduled Sampling for training
+- **residual** - True/False whether to use residual connection
 - **use_gpu** - enable GPU (default True)
 - **save** - path to the location to store the trained model & the configurations
         
