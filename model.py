@@ -19,6 +19,7 @@ class EncoderDecoder(object):
         self.decoding_method = config['decoding_method']
         self.max_sentence_length = config['max_sentence_length']
         self.beam_width = config['beam_width']
+        self._residual = config['residual']
         self._scheduled_sampling = config['scheduled_sampling']
         self._counter = 0 # for counting the number of iterations
         self._train_epochs = config['num_epochs']
@@ -69,7 +70,7 @@ class EncoderDecoder(object):
             with tf.variable_scope("enc_forward"):
                 cell_list = []
                 for i in range(num_bi_encoder_layers):
-                    single_cell = self.build_single_cell(self.num_units, self.dropout)
+                    single_cell = self.build_single_cell(self.num_units, self.dropout, self._residual)
                     cell_list.append(single_cell)
 
             if num_bi_encoder_layers == 1:
@@ -82,7 +83,7 @@ class EncoderDecoder(object):
             with tf.variable_scope("enc_backward"):
                 cell_list = []
                 for i in range(num_bi_encoder_layers):
-                    single_cell = self.build_single_cell(self.num_units, self.dropout)
+                    single_cell = self.build_single_cell(self.num_units, self.dropout, self._residual)
                     cell_list.append(single_cell)
 
             if num_bi_encoder_layers == 1:
@@ -129,9 +130,15 @@ class EncoderDecoder(object):
         ############################## Decoder ##############################
         with tf.variable_scope("decoder"):
             cell_list = []
-            for i in range(self.num_layers):
-                single_cell = self.build_single_cell(self.num_units, self.dropout)
+
+            # top of the stack -> no residual
+            single_cell = self.build_single_cell(self.num_units, self.dropout, residual=False)
+            cell_list.append(single_cell)
+
+            for i in range(self.num_layers-1):
+                single_cell = self.build_single_cell(self.num_units, self.dropout, self._residual)
                 cell_list.append(single_cell)
+
 
             if self.num_layers == 1:
                 stacked_decoder_cell = cell_list[0]
@@ -343,11 +350,16 @@ class EncoderDecoder(object):
         return tf.nn.embedding_lookup(self.tgt_word_embeddings, ids)
 
     # methods for build the network
-    def build_single_cell(self, num_units, dropout):
+    def build_single_cell(self, num_units, dropout, residual=False):
         '''build a single cell'''
         # LSTM cell
         single_cell = tf.nn.rnn_cell.LSTMCell(num_units, state_is_tuple=True)
         single_cell = tf.nn.rnn_cell.DropoutWrapper(cell=single_cell, input_keep_prob=1.0-dropout)
+
+        if residual:
+            single_cell = tf.nn.rnn_cell.ResidualWrapper(single_cell)
+            print('build RNN cell with residual connection')
+
         return single_cell
 
     def increment_counter(self):

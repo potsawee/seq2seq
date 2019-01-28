@@ -41,6 +41,7 @@ def add_arguments(parser):
     parser.add_argument('--random_seed', type=int, default=25)
     parser.add_argument('--decoding_method', type=str, default='greedy')
     parser.add_argument('--scheduled_sampling', type="bool", nargs="?", const=True, default=False)
+    parser.add_argument('--residual', type="bool", nargs="?", const=True, default=False)
     parser.add_argument('--load_embedding_src', type=str, default=None)
     parser.add_argument('--load_embedding_tgt', type=str, default=None)
 
@@ -165,6 +166,10 @@ def train(config):
     model = EncoderDecoder(config, params)
     model.build_network()
 
+    tf_variables = tf.trainable_variables()
+    for i in range(len(tf_variables)):
+        print(tf_variables[i])
+
     # save & restore model
     saver = tf.train.Saver(max_to_keep=1)
 
@@ -177,7 +182,7 @@ def train(config):
 
         else: # development only e.g. air202
             print('running locally...')
-            os.environ['CUDA_VISIBLE_DEVICES'] = '1' # choose the device (GPU) here
+            os.environ['CUDA_VISIBLE_DEVICES'] = '3' # choose the device (GPU) here
 
         sess_config = tf.ConfigProto(allow_soft_placement=True)
         sess_config.gpu_options.allow_growth = True # Whether the GPU memory usage can grow dynamically.
@@ -188,7 +193,6 @@ def train(config):
         sess_config = tf.ConfigProto()
 
 
-    # sess = tf.Session(config=sess_config) # sess.close() / sess.run()
     with tf.Session(config=sess_config) as sess:
 
         if saved_model == None:
@@ -211,10 +215,14 @@ def train(config):
             new_saver.restore(sess, saved_model)
             print('loaded model...', saved_model)
 
-
         # tf_variables = tf.trainable_variables()
         # for i in range(len(tf_variables)):
         #     print(tf_variables[i])
+        # pdb.set_trace()
+
+        # ------------ TensorBoard ------------ #
+        # summary_writer = tf.summary.FileWriter(save_path + '/tfboard/', graph_def=sess.graph_def)
+        # ------------------------------------- #
 
         num_epochs = config['num_epochs']
         for epoch in range(num_epochs):
@@ -244,7 +252,7 @@ def train(config):
                         [train_loss] = sess.run([model.train_loss], feed_dict=feed_dict)
                         print("BEAMSEARCH - batch: {} --- train_loss: {:.5f}".format(i, train_loss))
 
-                    [translations] = sess.run([model.translations], feed_dict=feed_dict)
+                    # [translations] = sess.run([model.translations], feed_dict=feed_dict)
                     # pdb.set_trace()
                     sys.stdout.flush()
 

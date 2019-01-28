@@ -78,7 +78,7 @@ def isfloat(value):
 def load_pretrained_embedding(word2id, embedding_matrix, embedding_path):
     # assign value to src_word_embeddings and tgt_word_embeddings
     counter = 0
-    with open(embedding_path, 'r') as file:
+    with open(embedding_path, encoding="utf8") as file:
         for line in file:
             items = line.strip().split()
             if len(items) <= 2:
