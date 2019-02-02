@@ -228,11 +228,35 @@ def train(config):
         # summary_writer = tf.summary.FileWriter(save_path + '/tfboard/', graph_def=sess.graph_def)
         # ------------------------------------- #
 
+        # ------------ To print out some output -------------------- #
+        my_sentences = ['this is test . </s>',
+                        'this is confirm my reservation at hotel . </s>',
+                        'playing tennis good for you . </s>',
+                        'when talking about successful longterm business relationships customer services are important element </s>']
+        my_sent_ids = []
+        for my_sentence in my_sentences:
+            ids = []
+            for word in my_sentence.split():
+                if word in src_word2id:
+                    ids.append(src_word2id[word])
+                else:
+                    ids.append(src_word2id['<unk>'])
+            my_sent_ids.append(ids)
+        my_sent_len = [len(my_sent) for my_sent in my_sent_ids]
+        my_sent_ids = [ids + [src_word2id['</s>']]*(config['max_sentence_length']-len(ids)) for ids in my_sent_ids]
+        infer_dict = {model.src_word_ids: my_sent_ids,
+                    model.src_sentence_lengths: my_sent_len,
+                    model.dropout: 0.0,
+                    model.learning_rate: learning_rate}
+        # ---------------------------------------------------------- #
+
         num_epochs = config['num_epochs']
         for epoch in range(num_epochs):
             print("num_batches = ", len(batches))
 
             random.shuffle(batches)
+
+            epoch_loss = 0
 
             for i, batch in enumerate(batches):
 
@@ -243,55 +267,26 @@ def train(config):
                             model.dropout: config['dropout'],
                             model.learning_rate: learning_rate}
 
-                _ = sess.run([model.train_op], feed_dict=feed_dict)
+                [_, loss] = sess.run([model.train_op, model.train_loss], feed_dict=feed_dict)
+                epoch_loss += loss
 
                 if i % 100 == 0:
                     # to print out training status
 
-                    if config['decoding_method'] != 'beamsearch':
-                        [train_loss, infer_loss] = sess.run([model.train_loss, model.infer_loss], feed_dict=feed_dict)
-                        print("batch: {} --- train_loss: {:.5f} | inf_loss: {:.5f}".format(i, train_loss, infer_loss))
+                    # if config['decoding_method'] != 'beamsearch':
+                        # [train_loss, infer_loss] = sess.run([model.train_loss, model.infer_loss], feed_dict=feed_dict)
+                        # print("batch: {} --- train_loss: {:.5f} | inf_loss: {:.5f}".format(i, train_loss, infer_loss))
 
-                    else:
+                    # else:
                         # --- beam search --- #
-                        [train_loss] = sess.run([model.train_loss], feed_dict=feed_dict)
-                        print("BEAMSEARCH - batch: {} --- train_loss: {:.5f}".format(i, train_loss))
+                        # [train_loss] = sess.run([model.train_loss], feed_dict=feed_dict)
+                        # print("BEAMSEARCH - batch: {} --- train_loss: {:.5f}".format(i, train_loss))
 
-                    # [translations] = sess.run([model.translations], feed_dict=feed_dict)
-                    # pdb.set_trace()
+                    print("batch: {} --- avg train loss: {:.5f}".format(i, epoch_loss/(i+1)))
+
                     sys.stdout.flush()
 
                 if i % 500 == 0:
-
-                    # my_sentences = ['They wrote almost a thousand pages on the topic . </s>',
-                    #                 'And it takes weeks to perform our integrations . </s>',
-                    #                 'It was terribly dangerous . </s>',
-                    #                 'This is a fourth alternative that you are soon going to have . </s>']
-                    my_sentences = ['this is test . </s>',
-                                    'this is confirm my reservation at hotel . </s>',
-                                    'playing tennis good for you . </s>',
-                                    'when talking about successful longterm business relationships customer services are important element </s>'
-                    ]
-
-                    my_sent_ids = []
-
-                    for my_sentence in my_sentences:
-                        ids = []
-                        for word in my_sentence.split():
-                            if word in src_word2id:
-                                ids.append(src_word2id[word])
-                            else:
-                                ids.append(src_word2id['<unk>'])
-                        my_sent_ids.append(ids)
-
-                    my_sent_len = [len(my_sent) for my_sent in my_sent_ids]
-                    my_sent_ids = [ids + [src_word2id['</s>']]*(config['max_sentence_length']-len(ids)) for ids in my_sent_ids]
-
-
-                    infer_dict = {model.src_word_ids: my_sent_ids,
-                                model.src_sentence_lengths: my_sent_len,
-                                model.dropout: 0.0,
-                                model.learning_rate: learning_rate}
 
                     [my_translations] = sess.run([model.translations], feed_dict=infer_dict)
                     # pdb.set_trace()
@@ -302,7 +297,11 @@ def train(config):
             model.increment_counter()
             learning_rate *= decay_rate
 
-            print("################## EPOCH {} done ##################".format(epoch))
+            print("---------------------------------------------------")
+            print("epoch {} done".format(epoch+1))
+            print("total training loss = {}".format(epoch_loss))
+            print("---------------------------------------------------")
+            
             saver.save(sess, save_path + '/model', global_step=epoch)
 
 def main():
