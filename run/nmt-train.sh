@@ -16,25 +16,25 @@ source activate tf_gpu
 export PYTHONBIN=/home/miproj/urop.2018/pm574/anaconda3/envs/tf_gpu/bin/python
 
 $PYTHONBIN /home/alta/BLTSpeaking/ged-pm574/local/seq2seq/train.py \
-    --train_src legacy/nmt-google/lib/data_ged/CLC.tgt \
-    --train_tgt legacy/nmt-google/lib/data_ged/CLC.src \
-    --vocab_src lib/wlists/vocab.clc.min-count2.en \
-    --vocab_tgt lib/wlists/vocab.clc.min-count2.en \
+    --train_src lib/new-training/train/src-tgt/combine/total.tgt \
+    --train_tgt lib/new-training/train/src-tgt/combine/total.src \
+    --vocab_src lib/new-training/vocab/clc-total.min-count4.en \
+    --vocab_tgt lib/new-training/vocab/clc-total.min-count4.en \
     --embedding_size 200 \
     --num_layers 4 \
     --dropout 0.2 \
     --num_units 200 \
     --learning_rate 0.001 \
-    --decay_rate 0.8 \
+    --decay_rate 0.9 \
     --batch_size 256 \
-    --num_epochs 10 \
+    --num_epochs 20 \
     --random_seed 25 \
     --decoding_method beamsearch \
     --beam_width 10 \
-    --max_sentence_length 50 \
+    --max_sentence_length 32 \
     --scheduled_sampling True \
     --residual True \
     --use_gpu True \
-    --save lib/models/tmp0 \
+    --save lib/models/new-training2/total \
     --load_embedding_src lib/embeddings/glove.6B.200d.txt \
     --load_embedding_tgt lib/embeddings/glove.6B.200d.txt \

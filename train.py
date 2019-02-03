@@ -4,6 +4,7 @@ import random
 # import numpy as np
 import tensorflow as tf
 import argparse
+import math
 import pdb
 
 from model import EncoderDecoder
@@ -219,11 +220,6 @@ def train(config):
             new_saver.restore(sess, saved_model)
             print('loaded model...', saved_model)
 
-        # tf_variables = tf.trainable_variables()
-        # for i in range(len(tf_variables)):
-        #     print(tf_variables[i])
-        # pdb.set_trace()
-
         # ------------ TensorBoard ------------ #
         # summary_writer = tf.summary.FileWriter(save_path + '/tfboard/', graph_def=sess.graph_def)
         # ------------------------------------- #
@@ -301,7 +297,11 @@ def train(config):
             print("epoch {} done".format(epoch+1))
             print("total training loss = {}".format(epoch_loss))
             print("---------------------------------------------------")
-            
+
+            if math.isnan(epoch_loss):
+                print("stop training - loss/gradient exploded")
+                break
+
             saver.save(sess, save_path + '/model', global_step=epoch)
 
 def main():
