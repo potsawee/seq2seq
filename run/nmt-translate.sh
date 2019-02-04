@@ -16,7 +16,8 @@ source activate tf_gpu
 export PYTHONBIN=/home/miproj/urop.2018/pm574/anaconda3/envs/tf_gpu/bin/python
 
 $PYTHONBIN /home/alta/BLTSpeaking/ged-pm574/local/seq2seq/translate.py \
-    --load lib/models/clc-arf-sample1 \
-    --srcfile /home/alta/BLTSpeaking/ged-pm574/artificial-error/lib/nmt-corrupt/cts8.gec.orig.dot \
-    --tgtfile /home/alta/BLTSpeaking/ged-pm574/artificial-error/lib/nmt-corrupt/clc-arf-sample1/cts8.gec.nmt.dot
-    # --model_number
+    --load lib/models/new-training2/total \
+    --srcfile /home/alta/BLTSpeaking/ged-pm574/nmt-exp/jfleg/test/test.src.lower \
+    --tgtfile /home/alta/BLTSpeaking/ged-pm574/nmt-exp/gec-output/new-training2/jfleg-test/total.pyspell.out \
+    --spellcheck True \
+    --model_number 8

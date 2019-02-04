@@ -5,6 +5,7 @@ import tensorflow as tf
 import argparse
 import pdb
 
+from spellchecker import SpellChecker
 from model import EncoderDecoder
 from helper import load_vocab, read_config
 
@@ -14,19 +15,26 @@ Translating source sentences to target sentences using a trained model
 
 def get_translate_arguments(parser):
     '''Arguments for translating'''
+
+    parser.register("type", "bool", lambda v: v.lower() == "true")
+
     # file paths
     parser.add_argument('--load', type=str, required=True)  # path to load model
     parser.add_argument('--srcfile', type=str, required=True)
     parser.add_argument('--tgtfile', type=str, required=True)
+    parser.add_argument('--spellcheck', type="bool", nargs="?", const=True, default=False)
     parser.add_argument('--model_number', type=int, default=None)
 
     return parser
 
-def src_data(srcfile, src_word2id, max_sentence_length):
+def src_data(srcfile, src_word2id, max_sentence_length, spellcheck=False):
     src_sentences = []
     with open(srcfile, 'r') as file:
         for line in file:
             src_sentences.append(line.strip())
+
+    if spellcheck:
+        spell = SpellChecker()
 
     src_sent_ids = []
     for sentence in src_sentences:
@@ -35,7 +43,15 @@ def src_data(srcfile, src_word2id, max_sentence_length):
             if word in src_word2id:
                 ids.append(src_word2id[word])
             else:
-                ids.append(src_word2id['<unk>'])
+                if spellcheck:
+                    x = spell.correction(word)
+                    if x in src_word2id:
+                        print("Spellcheck: {} => {}".format(word, x))
+                        ids.append(src_word2id[x])
+                    else:
+                        ids.append(src_word2id['<unk>'])
+                else:
+                    ids.append(src_word2id['<unk>'])
         src_sent_ids.append(ids)
 
     # check if each sentence is too long
@@ -57,7 +73,7 @@ def translate(config):
 
     else: # development only e.g. air202
         print('running locally...')
-        os.environ['CUDA_VISIBLE_DEVICES'] = '1' # choose the device (GPU) here
+        os.environ['CUDA_VISIBLE_DEVICES'] = '' # choose the device (GPU) here
 
     sess_config = tf.ConfigProto()
 
@@ -86,10 +102,12 @@ def translate(config):
         saver.restore(sess, full_save_path_to_model)
         # print("Model restored")
 
-        src_sent_ids, src_sent_len = src_data(config['srcfile'], src_word2id, config['max_sentence_length'])
+        src_sent_ids, src_sent_len = src_data(config['srcfile'], src_word2id,
+                                            config['max_sentence_length'], config['spellcheck'])
 
         num_sentences = len(src_sent_ids)
-        batch_size = 1000
+        # batch_size = config['batch_size'] # maybe too small (inefficient) - but should be not too large
+        batch_size = 100 # this is okay - it requires much lower memory compared to training
         num_batches = int(num_sentences/batch_size) + 1
 
         tgt_lines = []
@@ -115,7 +133,7 @@ def translate(config):
                 # print(' '.join(words))
                 tgt_lines.append(' '.join(words))
 
-            print('#', end='')
+            print('#')
             sys.stdout.flush()
 
         with open(config['tgtfile'], 'w') as file:
@@ -135,6 +153,7 @@ def main():
     config['srcfile'] = args['srcfile']
     config['tgtfile'] = args['tgtfile']
     config['model_number'] = args['model_number']
+    config['spellcheck'] = args['spellcheck']
 
     translate(config=config)
 
