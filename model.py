@@ -203,12 +203,14 @@ class EncoderDecoder(object):
             # Inference Helper (1) greedy search (2) sample (3) modified-sample (4) beam search
             if self.decoding_method != 'beamsearch':
                 if self.decoding_method == 'greedy':
+                    print('greedy search enabled')
                     infer_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
                         embedding=self.embedding_decoder,
                         start_tokens=tf.fill([s[0]], self.params['go_id']),
                         end_token=self.params['eos_id'])
 
                 elif self.decoding_method == 'sample1':
+                    print('sampling1 enabled')
                     infer_helper = tf.contrib.seq2seq.SampleEmbeddingHelper(
                         embedding=self.embedding_decoder,
                         start_tokens=tf.fill([s[0]], self.params['go_id']),
@@ -217,6 +219,7 @@ class EncoderDecoder(object):
 
                 elif self.decoding_method == 'sample2':
                     """sample to get output & argmax to get element for the next time step"""
+                    print('sampling2 enabled')
                     infer_helper = ModifiedSampleEmbeddingHelper(
                         embedding=self.embedding_decoder,
                         start_tokens=tf.fill([s[0]], self.params['go_id']),
@@ -230,7 +233,7 @@ class EncoderDecoder(object):
                     output_layer=projection_layer)
 
             elif self.decoding_method == 'beamsearch':
-
+                print('beam search enabled')
                 encoder_outputs = tf.contrib.seq2seq.tile_batch(encoder_outputs, multiplier=self.beam_width)
                 src_sentence_lengths_beam = tf.contrib.seq2seq.tile_batch(self.src_sentence_lengths, multiplier=self.beam_width)
                 encoder_state = tf.contrib.seq2seq.tile_batch(encoder_state, multiplier=self.beam_width)

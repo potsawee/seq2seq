@@ -22,6 +22,7 @@ def get_translate_arguments(parser):
     parser.add_argument('--load', type=str, required=True)  # path to load model
     parser.add_argument('--srcfile', type=str, required=True)
     parser.add_argument('--tgtfile', type=str, required=True)
+    parser.add_argument('--decoding_method', type=str, default=None)
     parser.add_argument('--spellcheck', type="bool", nargs="?", const=True, default=False)
     parser.add_argument('--model_number', type=int, default=None)
 
@@ -29,7 +30,7 @@ def get_translate_arguments(parser):
 
 def src_data(srcfile, src_word2id, max_sentence_length, spellcheck=False):
     src_sentences = []
-    with open(srcfile, 'r') as file:
+    with open(srcfile, encoding="utf8") as file:
         for line in file:
             src_sentences.append(line.strip())
 
@@ -154,6 +155,9 @@ def main():
     config['tgtfile'] = args['tgtfile']
     config['model_number'] = args['model_number']
     config['spellcheck'] = args['spellcheck']
+
+    if args['decoding_method'] != None:
+        config['decoding_method'] = args['decoding_method']
 
     translate(config=config)
 
