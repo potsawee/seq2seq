@@ -60,6 +60,11 @@ def read_config(path):
                 val = int(x[1])
             elif isfloat(x[1]):
                 val = float(x[1])
+            elif x[1] == "True" or x[1] == "False":
+                if x[1] == "True":
+                    val = True
+                else:
+                    val = False 
             else: # string
                 val = x[1]
 
